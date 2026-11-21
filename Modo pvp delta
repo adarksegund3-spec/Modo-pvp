@@ -1,0 +1,2504 @@
+-- ANGEL | MODO PVP v4 (intro + hub) | LocalScript / executor
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ES, ED, UIT = Enum.EasingStyle, Enum.EasingDirection, Enum.UserInputType
+local TXA, TYA, AS, FNT, MAT = Enum.TextXAlignment, Enum.TextYAlignment, Enum.AutomaticSize, Enum.Font, Enum.Material
+local RGB, UO, US, U2, UD = Color3.fromRGB, UDim2.fromOffset, UDim2.fromScale, UDim2.new, UDim.new
+local V2, V3, CK, NK, CS, NS = Vector2.new, Vector3.new, ColorSequenceKeypoint.new, NumberSequenceKeypoint.new, ColorSequence.new, NumberSequence.new
+if not game:IsLoaded() then
+game.Loaded:Wait()
+end
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera or workspace:WaitForChild("Camera")
+local HOLD_TIME = 3.0      -- tempo parada na tela após a entrada completa
+local FADE_OUT = 1.5       -- duração da saída
+local TITLE_FONT = FNT.Fantasy      -- gótico/medieval legível
+local SUBTITLE_FONT = FNT.Antique
+local PURPLE = RGB(145, 35, 255)
+local DEEP_PURPLE = RGB(86, 12, 168)
+local LIGHT_PURPLE = RGB(190, 110, 255)
+local LAVENDER = RGB(225, 200, 255)
+local WHITE = RGB(255, 255, 255)
+local BLACK = RGB(0, 0, 0)
+local Rng = Random.new()
+Player:SetAttribute("AngelIntroFinished", false)
+local FinishedEvent = ReplicatedStorage:FindFirstChild("AngelIntroFinished")
+if not FinishedEvent then
+FinishedEvent = Instance.new("BindableEvent")
+FinishedEvent.Name = "AngelIntroFinished"
+FinishedEvent.Parent = ReplicatedStorage
+end
+local function Tween(object, duration, properties, style, direction, delayTime)
+local animation = TweenService:Create(
+object,
+TweenInfo.new(
+duration,
+style or ES.Sine,
+direction or ED.InOut,
+0,
+false,
+delayTime or 0
+),
+properties
+)
+animation:Play()
+return animation
+end
+local function Create(className, properties, parent)
+local instance = Instance.new(className)
+if instance:IsA("GuiObject") then instance.BorderSizePixel = 0 end
+for key, value in pairs(properties) do
+instance[key] = value
+end
+instance.Parent = parent
+return instance
+end
+local function AddCorner(parent, radius)
+return Create("UICorner", { CornerRadius = UD(0, radius) }, parent)
+end
+local function PlayIntro()
+local Old = PlayerGui:FindFirstChild("AngelPvPIntro")
+if Old then
+Old:Destroy()
+end
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "AngelPvPIntro"
+GUI.IgnoreGuiInset = true
+GUI.DisplayOrder = 999999
+GUI.ResetOnSpawn = false
+GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function()
+GUI.ScreenInsets = Enum.ScreenInsets.None
+end)
+GUI.Parent = PlayerGui
+do
+local t = 0
+while Camera.ViewportSize.X < 100 and t < 2 do
+t += task.wait()
+end
+end
+local Viewport = Camera.ViewportSize
+local TitleSize = math.floor(math.clamp(math.min(Viewport.Y * 0.14, Viewport.X * 0.115), 38, 92))
+local SubtitleSize = math.floor(math.clamp(TitleSize * 0.27, 14, 24))
+local IsSmall = Viewport.X < 700
+local CENTER_Y = 0.46
+local Background = Create("Frame", {
+Name = "Background",
+Size = US(1, 1),
+BackgroundColor3 = WHITE,
+ZIndex = 1,
+}, GUI)
+Create("UIGradient", {
+Rotation = 0,
+Color = CS({
+CK(0, RGB(58, 8, 112)),
+CK(0.22, RGB(20, 3, 40)),
+CK(0.5, RGB(2, 1, 5)),
+CK(0.78, RGB(20, 3, 40)),
+CK(1, RGB(58, 8, 112)),
+}),
+}, Background)
+local function CreateSideLight(name, anchorX, rotation)
+local light = Create("Frame", {
+Name = name,
+AnchorPoint = V2(anchorX, 0.5),
+Position = US(anchorX, 0.5),
+Size = US(0.5, 1),
+BackgroundColor3 = PURPLE,
+BackgroundTransparency = 1,
+ZIndex = 2,
+}, GUI)
+Create("UIGradient", {
+Rotation = rotation,
+Transparency = NS({
+NK(0, 0.35),
+NK(0.35, 0.75),
+NK(1, 1),
+}),
+}, light)
+return light
+end
+local LeftLight = CreateSideLight("LeftLight", 0, 0)
+local RightLight = CreateSideLight("RightLight", 1, 180)
+local function CreateVignette(name, anchorY, rotation)
+local vignette = Create("Frame", {
+Name = name,
+AnchorPoint = V2(0.5, anchorY),
+Position = US(0.5, anchorY),
+Size = US(1, 0.38),
+BackgroundColor3 = BLACK,
+BackgroundTransparency = 1,
+ZIndex = 3,
+}, GUI)
+Create("UIGradient", {
+Rotation = rotation,
+Transparency = NS({
+NK(0, 0),
+NK(1, 1),
+}),
+}, vignette)
+return vignette
+end
+local TopVignette = CreateVignette("TopVignette", 0, 90)
+local BottomVignette = CreateVignette("BottomVignette", 1, 270)
+local Content = Create("Frame", {
+Name = "Content",
+AnchorPoint = V2(0.5, 0.5),
+Position = US(0.5, 0.5),
+Size = US(1, 1),
+BackgroundTransparency = 1,
+ZIndex = 4,
+}, GUI)
+local ContentScale = Create("UIScale", { Scale = 1.07 }, Content)
+local Active = true
+local Ambient = {}
+local AmbientTweens = {}
+for _ = 1, IsSmall and 12 or 20 do
+local size = Rng:NextInteger(2, 4)
+local particle = Create("Frame", {
+Name = "Ambient",
+AnchorPoint = V2(0.5, 0.5),
+Position = US(Rng:NextNumber(0.04, 0.96), Rng:NextNumber(0.06, 0.94)),
+Size = UO(size, size),
+BackgroundColor3 = LIGHT_PURPLE,
+BackgroundTransparency = 1,
+ZIndex = 1,
+}, Content)
+Create("UICorner", { CornerRadius = UD(1, 0) }, particle)
+table.insert(Ambient, particle)
+end
+local TitleHolder = Create("Frame", {
+Name = "TitleHolder",
+AnchorPoint = V2(0.5, 0.5),
+Position = US(0.5, CENTER_Y),
+Size = U2(0.96, 0, 0, math.floor(TitleSize * 1.4)),
+BackgroundTransparency = 1,
+ZIndex = 5,
+}, Content)
+local function CreateTitleLabel(name, color, zIndex)
+return Create("TextLabel", {
+Name = name,
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = "MODO PVP",
+TextColor3 = color,
+TextTransparency = 1,
+TextSize = TitleSize,
+Font = TITLE_FONT,
+TextXAlignment = TXA.Center,
+TextYAlignment = TYA.Center,
+ZIndex = zIndex,
+}, TitleHolder)
+end
+local TitleGlow = CreateTitleLabel("TitleGlow", PURPLE, 5)
+local GlowStroke = Create("UIStroke", {
+Color = PURPLE,
+Thickness = math.max(4, math.floor(TitleSize * 0.09)),
+Transparency = 1,
+}, TitleGlow)
+local Title = CreateTitleLabel("Title", WHITE, 7)
+local TitleStroke = Create("UIStroke", {
+Color = LIGHT_PURPLE,
+Thickness = 1,
+Transparency = 1,
+}, Title)
+Create("UIGradient", {
+Rotation = 90,
+Color = CS({
+CK(0, WHITE),
+CK(0.6, RGB(236, 220, 255)),
+CK(1, RGB(190, 140, 255)),
+}),
+}, Title)
+local Shine = CreateTitleLabel("Shine", WHITE, 8)
+local ShineGradient = Create("UIGradient", {
+Offset = V2(-1, 0),
+Transparency = NS({
+NK(0, 1),
+NK(0.4, 1),
+NK(0.5, 0.1),
+NK(0.6, 1),
+NK(1, 1),
+}),
+}, Shine)
+task.wait()
+local TextWidth = math.max(Title.TextBounds.X, TitleSize * 4.5)
+TextWidth = math.min(TextWidth, Viewport.X * 0.92)
+local Divider = Create("Frame", {
+Name = "Divider",
+AnchorPoint = V2(0.5, 0.5),
+Position = U2(0.5, 0, CENTER_Y, math.floor(TitleSize * 0.68)),
+Size = UO(0, 2),
+BackgroundColor3 = LAVENDER,
+BackgroundTransparency = 1,
+ZIndex = 6,
+}, Content)
+Create("UIGradient", {
+Transparency = NS({
+NK(0, 1),
+NK(0.5, 0.05),
+NK(1, 1),
+}),
+}, Divider)
+local SubtitleOffsetY = math.floor(TitleSize * 0.68 + SubtitleSize * 1.25)
+local Subtitle = Create("TextLabel", {
+Name = "Subtitle",
+AnchorPoint = V2(0.5, 0.5),
+Position = U2(0.5, 0, CENTER_Y, SubtitleOffsetY + 10),
+Size = U2(0.9, 0, 0, SubtitleSize + 8),
+BackgroundTransparency = 1,
+Text = "Criador: Angel",
+TextColor3 = RGB(215, 190, 240),
+TextTransparency = 1,
+TextSize = SubtitleSize,
+Font = SUBTITLE_FONT,
+ZIndex = 6,
+}, Content)
+local SubtitleStroke = Create("UIStroke", {
+Color = PURPLE,
+Thickness = 1,
+Transparency = 1,
+}, Subtitle)
+local Tongues = {}
+local TongueCount = IsSmall and 9 or 14
+local FireBaseY = -math.floor(TitleSize * 0.33)
+local TONGUE_TRANSPARENCY = 0.42
+for i = 1, TongueCount do
+local t = i / (TongueCount + 1)
+local shape = 0.55 + 0.45 * math.sin(math.pi * t)
+local baseHeight = TitleSize * Rng:NextNumber(0.28, 0.46) * shape
+local baseWidth = TitleSize * Rng:NextNumber(0.09, 0.15)
+local xOffset = (t - 0.5) * TextWidth * 0.92 + Rng:NextNumber(-4, 4)
+local tongue = Create("Frame", {
+Name = "Flame",
+AnchorPoint = V2(0.5, 1),
+Position = U2(0.5, xOffset, CENTER_Y, FireBaseY),
+Size = UO(baseWidth, baseHeight),
+BackgroundColor3 = WHITE,
+BackgroundTransparency = 1,
+Rotation = Rng:NextNumber(-8, 8),
+ZIndex = 3,
+}, Content)
+Create("UICorner", { CornerRadius = UD(1, 0) }, tongue)
+Create("UIGradient", {
+Rotation = 90,
+Color = CS({
+CK(0, LIGHT_PURPLE),
+CK(1, DEEP_PURPLE),
+}),
+Transparency = NS({
+NK(0, 1),
+NK(0.45, 0.65),
+NK(1, 0.1),
+}),
+}, tongue)
+table.insert(Tongues, {
+Frame = tongue,
+Height = baseHeight,
+Width = baseWidth,
+})
+end
+local function FlickerLoop(data)
+task.spawn(function()
+task.wait(Rng:NextNumber(0, 0.4))
+while Active and data.Frame.Parent do
+local duration = Rng:NextNumber(0.18, 0.36)
+Tween(data.Frame, duration, {
+Size = UO(
+data.Width * Rng:NextNumber(0.75, 1.2),
+data.Height * Rng:NextNumber(0.6, 1.3)
+),
+Rotation = Rng:NextNumber(-10, 10),
+})
+task.wait(duration)
+end
+end)
+end
+local function SpawnEmber()
+local size = Rng:NextInteger(2, 4)
+local life = Rng:NextNumber(1.8, 3.0)
+local rise = Rng:NextNumber(TitleSize * 0.8, TitleSize * 1.9)
+local drift = Rng:NextNumber(-TitleSize * 0.35, TitleSize * 0.35)
+local startX = Rng:NextNumber(-TextWidth * 0.46, TextWidth * 0.46)
+local startY = Rng:NextNumber(-TitleSize * 0.35, TitleSize * 0.15)
+local ember = Create("Frame", {
+Name = "Ember",
+AnchorPoint = V2(0.5, 0.5),
+Position = U2(0.5, startX, CENTER_Y, startY),
+Size = UO(size, size),
+BackgroundColor3 = LIGHT_PURPLE:Lerp(PURPLE, Rng:NextNumber(0, 1)),
+BackgroundTransparency = 1,
+ZIndex = 9,
+}, Content)
+Create("UICorner", { CornerRadius = UD(1, 0) }, ember)
+Tween(ember, life, {
+Position = U2(0.5, startX + drift, CENTER_Y, startY - rise),
+Size = UO(1, 1),
+}, ES.Sine, ED.Out)
+Tween(ember, 0.35, { BackgroundTransparency = 0.2 })
+Tween(ember, life - 0.35, { BackgroundTransparency = 1 },
+ES.Quad, ED.In, 0.35)
+task.delay(life + 0.1, function()
+if ember then
+ember:Destroy()
+end
+end)
+end
+Tween(LeftLight, 1.8, { BackgroundTransparency = 0 }, ES.Sine, ED.Out)
+Tween(RightLight, 1.8, { BackgroundTransparency = 0 }, ES.Sine, ED.Out)
+Tween(TopVignette, 1.4, { BackgroundTransparency = 0.2 })
+Tween(BottomVignette, 1.4, { BackgroundTransparency = 0.2 })
+Tween(ContentScale, 2.2, { Scale = 1 }, ES.Quint, ED.Out)
+for _, particle in ipairs(Ambient) do
+Tween(particle, 1.6, { BackgroundTransparency = Rng:NextNumber(0.35, 0.55) },
+ES.Sine, ED.Out, Rng:NextNumber(0, 0.8))
+local origin = particle.Position
+local loop = TweenService:Create(
+particle,
+TweenInfo.new(Rng:NextNumber(3, 5), ES.Sine, ED.InOut, -1, true),
+{
+Position = origin + US(Rng:NextNumber(-0.02, 0.02), Rng:NextNumber(-0.05, 0.05)),
+}
+)
+table.insert(AmbientTweens, loop)
+loop:Play()
+end
+task.wait(0.25)
+Tween(TitleGlow, 1.5, { TextTransparency = 0.72 }, ES.Quint, ED.Out)
+Tween(GlowStroke, 1.5, { Transparency = 0.8 }, ES.Quint, ED.Out)
+Tween(Title, 1.4, { TextTransparency = 0 }, ES.Quint, ED.Out)
+Tween(TitleStroke, 1.4, { Transparency = 0.55 }, ES.Quint, ED.Out)
+local GlowPulse = TweenService:Create(
+GlowStroke,
+TweenInfo.new(1.6, ES.Sine, ED.InOut, -1, true),
+{ Transparency = 0.6 }
+)
+task.delay(1.5, function()
+if Active then
+GlowPulse:Play()
+end
+end)
+task.delay(0.55, function()
+for _, data in ipairs(Tongues) do
+Tween(data.Frame, 1.1, { BackgroundTransparency = TONGUE_TRANSPARENCY },
+ES.Sine, ED.Out)
+FlickerLoop(data)
+end
+task.spawn(function()
+while Active do
+SpawnEmber()
+task.wait(Rng:NextNumber(0.07, 0.15))
+end
+end)
+end)
+Tween(Divider, 1.3, { Size = UO(math.floor(TextWidth * 0.78), 2), BackgroundTransparency = 0 },
+ES.Quint, ED.Out, 0.7)
+Tween(Shine, 0.6, { TextTransparency = 0 }, ES.Sine, ED.Out, 0.7)
+task.spawn(function()
+task.wait(0.8)
+while Active do
+ShineGradient.Offset = V2(-1, 0)
+Tween(ShineGradient, 1.4, { Offset = V2(1, 0) })
+task.wait(2.8)
+end
+end)
+Tween(Subtitle, 1.2, {
+TextTransparency = 0,
+Position = U2(0.5, 0, CENTER_Y, SubtitleOffsetY),
+}, ES.Quint, ED.Out, 1.0)
+Tween(SubtitleStroke, 1.2, { Transparency = 0.8 }, ES.Quint, ED.Out, 1.0)
+task.wait(2.2 + HOLD_TIME)
+Active = false
+GlowPulse:Cancel()
+for _, animation in ipairs(AmbientTweens) do
+animation:Cancel()
+end
+Tween(ContentScale, FADE_OUT + 0.35, { Scale = 1.04 }, ES.Sine, ED.InOut)
+Tween(Title, FADE_OUT, { TextTransparency = 1 })
+Tween(TitleStroke, FADE_OUT, { Transparency = 1 })
+Tween(TitleGlow, FADE_OUT, { TextTransparency = 1 })
+Tween(GlowStroke, FADE_OUT, { Transparency = 1 })
+Tween(Shine, FADE_OUT * 0.6, { TextTransparency = 1 })
+Tween(Subtitle, FADE_OUT * 0.85, { TextTransparency = 1 })
+Tween(SubtitleStroke, FADE_OUT * 0.85, { Transparency = 1 })
+Tween(Divider, FADE_OUT, { BackgroundTransparency = 1, Size = UO(math.floor(TextWidth * 0.95), 2) })
+for _, data in ipairs(Tongues) do
+Tween(data.Frame, FADE_OUT * 0.8, { BackgroundTransparency = 1 })
+end
+for _, particle in ipairs(Ambient) do
+Tween(particle, FADE_OUT * 0.8, { BackgroundTransparency = 1 })
+end
+Tween(LeftLight, FADE_OUT, { BackgroundTransparency = 1 }, nil, nil, 0.2)
+Tween(RightLight, FADE_OUT, { BackgroundTransparency = 1 }, nil, nil, 0.2)
+Tween(TopVignette, FADE_OUT, { BackgroundTransparency = 1 }, nil, nil, 0.2)
+Tween(BottomVignette, FADE_OUT, { BackgroundTransparency = 1 }, nil, nil, 0.2)
+local FinalFade = Tween(Background, FADE_OUT, { BackgroundTransparency = 1 }, nil, nil, 0.35)
+FinalFade.Completed:Wait()
+GUI:Destroy()
+Player:SetAttribute("AngelIntroFinished", true)
+FinishedEvent:Fire()
+end
+local function InitHub()
+for _, name in ipairs({ "AngelPvPMenu", "AngelPvPOverlay" }) do
+local previous = PlayerGui:FindFirstChild(name)
+if previous then
+previous:Destroy()
+end
+end
+local Connections = {}
+local Unloaders = {}
+local Unloaded = false
+local function Connect(signal, callback)
+local connection = signal:Connect(callback)
+table.insert(Connections, connection)
+return connection
+end
+local Theme = {
+RowBg = RGB(20, 10, 34),
+RowHover = RGB(40, 20, 70),
+Off = RGB(62, 46, 92),
+Stroke = RGB(128, 62, 210),
+Text = RGB(250, 245, 255),
+Muted = RGB(178, 160, 210),
+Amber = RGB(255, 190, 70),
+}
+local LEFT = TXA.Left
+local RIGHT = TXA.Right
+local CENTER = TXA.Center
+local BODY_BOLD = FNT.GothamBold
+local BODY = FNT.GothamMedium
+local Settings = {
+AutoAlign = true, -- compensa as bordas da tela (notch) para ESP e FOV
+Hitbox = { Enabled = false, Color = PURPLE, Size = 8, Transparency = 0.6 },
+Aimbot = {
+Enabled = false,
+Smooth = 40,
+FOV = 40,
+ShowFOV = true,
+IgnoreWalls = false,
+Part = "Cabeça",
+HoldRMB = true,
+PosX = 50,     -- posição do centro do FOV (% da largura da tela)
+PosY = 42.5,   -- posição do centro do FOV (% da altura da tela)
+DragMode = false,
+},
+ESP = {
+Enabled = false,
+Skeleton = false,
+Name = false,
+Tracers = false,
+Box = false,
+Distance = false,
+Health = false,
+Hologram = false,
+HoloColor = RGB(60, 255, 120),
+HoloTransparency = 0.5,
+OffX = 0,
+OffY = 0,
+},
+}
+local LayoutCounter = 0
+local function NextOrder()
+LayoutCounter += 1
+return LayoutCounter
+end
+local OverlayGui = Create("ScreenGui", {
+Name = "AngelPvPOverlay",
+IgnoreGuiInset = true,
+DisplayOrder = 900,
+ResetOnSpawn = false,
+ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, nil)
+pcall(function()
+OverlayGui.ScreenInsets = Enum.ScreenInsets.None
+end)
+OverlayGui.Parent = PlayerGui
+local MenuGui = Create("ScreenGui", {
+Name = "AngelPvPMenu",
+IgnoreGuiInset = true,
+DisplayOrder = 1000,
+ResetOnSpawn = false,
+ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, nil)
+pcall(function()
+MenuGui.ScreenInsets = Enum.ScreenInsets.None
+end)
+MenuGui.Parent = PlayerGui
+local Screen = Camera.ViewportSize
+local MenuSmall = Screen.X < 700
+-- Tamanho real da tela (onde o overlay desenha)
+local function ScreenSize()
+local abs = OverlayGui.AbsoluteSize
+if abs.X < 50 or abs.Y < 50 then
+local cam = workspace.CurrentCamera
+return cam and cam.ViewportSize or Screen
+end
+return abs
+end
+-- Diferença entre a tela inteira e a área da câmera (bordas/notch)
+local function ScreenOffset()
+if not Settings.AutoAlign then
+return V2(0, 0)
+end
+local cam = workspace.CurrentCamera
+local abs = OverlayGui.AbsoluteSize
+if not cam or abs.X < 50 or abs.Y < 50 then
+return V2(0, 0)
+end
+local view = cam.ViewportSize
+return V2(
+math.clamp((abs.X - view.X) / 2, -150, 150),
+math.clamp((abs.Y - view.Y) / 2, -150, 150)
+)
+end
+-- Mundo -> coordenadas do overlay (já alinhadas com a tela real)
+local function W2S(cam, position, extra)
+local p = cam:WorldToViewportPoint(position)
+local o = ScreenOffset()
+return V3(
+p.X + o.X + (extra and extra.X or 0),
+p.Y + o.Y + (extra and extra.Y or 0),
+p.Z
+)
+end
+local function MakeDraggable(handle, target, onClick, keepInside)
+local dragging = false
+local moved = false
+local dragStart
+local startPos
+local startCenter
+Connect(handle.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+dragging = true
+moved = false
+dragStart = V2(input.Position.X, input.Position.Y)
+startPos = target.Position
+startCenter = target.AbsolutePosition + target.AbsoluteSize * 0.5
+local ended
+ended = input.Changed:Connect(function()
+if input.UserInputState == Enum.UserInputState.End then
+ended:Disconnect()
+dragging = false
+if not moved and onClick then
+onClick()
+end
+end
+end)
+end
+end)
+Connect(UserInputService.InputChanged, function(input)
+if not dragging then
+return
+end
+if input.UserInputType == UIT.MouseMovement
+or input.UserInputType == UIT.Touch then
+local delta = V2(input.Position.X, input.Position.Y) - dragStart
+if not moved and delta.Magnitude < 6 then
+return
+end
+moved = true
+if keepInside then
+local view = Camera.ViewportSize
+local size = target.AbsoluteSize
+local center = startCenter + delta
+local cx = math.clamp(center.X, size.X / 2, math.max(view.X - size.X / 2, size.X / 2))
+local cy = math.clamp(center.Y, size.Y / 2, math.max(view.Y - size.Y / 2, size.Y / 2))
+target.Position = UO(cx, cy)
+else
+target.Position = U2(
+startPos.X.Scale, startPos.X.Offset + delta.X,
+startPos.Y.Scale, startPos.Y.Offset + delta.Y
+)
+end
+end
+end)
+end
+local Toast = Create("TextLabel", {
+Name = "Toast",
+AnchorPoint = V2(0.5, 0),
+Position = U2(0.5, 0, 0, -60),
+Size = UO(280, 34),
+BackgroundColor3 = RGB(14, 6, 26),
+BackgroundTransparency = 0.05,
+Text = "",
+TextColor3 = Theme.Text,
+TextSize = 14,
+Font = BODY,
+TextTruncate = Enum.TextTruncate.AtEnd,
+ZIndex = 50,
+}, MenuGui)
+AddCorner(Toast, 17)
+Create("UIStroke", { Color = PURPLE, Transparency = 0.3, Thickness = 1 }, Toast)
+local ToastToken = 0
+local function Notify(text)
+ToastToken += 1
+local token = ToastToken
+Toast.Text = text
+Tween(Toast, 0.4, { Position = U2(0.5, 0, 0, 24) }, ES.Quint, ED.Out)
+task.delay(2.2, function()
+if token == ToastToken then
+Tween(Toast, 0.35, { Position = U2(0.5, 0, 0, -60) }, ES.Quint, ED.In)
+end
+end)
+end
+local LogoW = MenuSmall and 104 or 118
+local LogoH = MenuSmall and 32 or 36
+local LogoRoot = Create("Frame", {
+Name = "LogoRoot",
+AnchorPoint = V2(0, 0.5),
+Position = U2(0, 12, 0.5, 0),
+Size = UO(LogoW, LogoH),
+BackgroundTransparency = 1,
+ZIndex = 20,
+}, MenuGui)
+local LogoEntrance = Create("UIScale", { Scale = 0 }, LogoRoot)
+local LogoBody = Create("Frame", {
+Name = "Body",
+Size = US(1, 1),
+BackgroundTransparency = 1,
+ZIndex = 20,
+}, LogoRoot)
+local LogoHover = Create("UIScale", { Scale = 1 }, LogoBody)
+local LogoGlow = Create("Frame", {
+Name = "Glow",
+AnchorPoint = V2(0.5, 0.5),
+Position = US(0.5, 0.5),
+Size = U2(1, 14, 1, 14),
+BackgroundColor3 = PURPLE,
+BackgroundTransparency = 0.86,
+ZIndex = 20,
+}, LogoBody)
+AddCorner(LogoGlow, 14)
+local LogoBg = Create("Frame", {
+Name = "Bg",
+Size = US(1, 1),
+BackgroundColor3 = WHITE,
+ZIndex = 21,
+}, LogoBody)
+AddCorner(LogoBg, 10)
+Create("UIGradient", {
+Rotation = 0,
+Color = CS({
+CK(0, RGB(3, 1, 6)),
+CK(0.55, RGB(16, 6, 30)),
+CK(1, RGB(88, 20, 165)),
+}),
+}, LogoBg)
+local LogoStroke = Create("UIStroke", { Color = WHITE, Thickness = 1.6, Transparency = 0.05 }, LogoBg)
+local LogoStrokeGradient = Create("UIGradient", {
+Color = CS({
+CK(0, DEEP_PURPLE),
+CK(0.5, LIGHT_PURPLE),
+CK(1, DEEP_PURPLE),
+}),
+}, LogoStroke)
+local LogoSpin = TweenService:Create(
+LogoStrokeGradient,
+TweenInfo.new(4, ES.Linear, ED.InOut, -1),
+{ Rotation = 360 }
+)
+LogoSpin:Play()
+local LogoPulse = TweenService:Create(
+LogoGlow,
+TweenInfo.new(1.6, ES.Sine, ED.InOut, -1, true),
+{ BackgroundTransparency = 0.7 }
+)
+LogoPulse:Play()
+local LogoLine = Create("Frame", {
+AnchorPoint = V2(0.5, 1),
+Position = U2(0.5, 0, 1, -4),
+Size = U2(0.6, 0, 0, 1),
+BackgroundColor3 = LAVENDER,
+ZIndex = 22,
+}, LogoBody)
+Create("UIGradient", {
+Transparency = NS({
+NK(0, 1),
+NK(0.5, 0.35),
+NK(1, 1),
+}),
+}, LogoLine)
+local LogoLabel = Create("TextLabel", {
+Name = "Label",
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = "Modo pvp",
+TextColor3 = WHITE,
+TextSize = MenuSmall and 17 or 19,
+Font = TITLE_FONT,
+TextXAlignment = CENTER,
+TextYAlignment = TYA.Center,
+ZIndex = 23,
+}, LogoBody)
+Create("UIGradient", {
+Rotation = 90,
+Color = CS({
+CK(0, WHITE),
+CK(1, RGB(196, 150, 255)),
+}),
+}, LogoLabel)
+local LogoButton = Create("TextButton", {
+Name = "LogoButton",
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = "",
+AutoButtonColor = false,
+ZIndex = 25,
+}, LogoBody)
+Connect(LogoButton.MouseEnter, function()
+Tween(LogoHover, 0.2, { Scale = 1.06 }, ES.Quint, ED.Out)
+Tween(LogoGlow, 0.2, { BackgroundTransparency = 0.72 })
+end)
+Connect(LogoButton.MouseLeave, function()
+Tween(LogoHover, 0.25, { Scale = 1 }, ES.Quint, ED.Out)
+end)
+Connect(LogoButton.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(LogoHover, 0.08, { Scale = 0.95 }, ES.Quad, ED.Out)
+end
+end)
+Connect(LogoButton.InputEnded, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(LogoHover, 0.18, { Scale = 1 }, ES.Back, ED.Out)
+end
+end)
+local HubWidth = math.floor(math.clamp(Screen.X * 0.94, 300, 580))
+local HubHeight = math.floor(math.clamp(Screen.Y * 0.86, 280, 430))
+local Hub = Create("CanvasGroup", {
+Name = "Hub",
+AnchorPoint = V2(0.5, 0.5),
+Position = US(0.5, 0.5),
+Size = UO(HubWidth, HubHeight),
+BackgroundTransparency = 1,
+GroupTransparency = 1,
+Visible = false,
+ZIndex = 10,
+}, MenuGui)
+AddCorner(Hub, 14)
+local HubScale = Create("UIScale", { Scale = 0.94 }, Hub)
+local HubBackground = Create("Frame", {
+Name = "HubBackground",
+Size = US(1, 1),
+BackgroundColor3 = WHITE,
+ZIndex = 1,
+}, Hub)
+AddCorner(HubBackground, 14)
+Create("UIGradient", {
+Rotation = 125,
+Color = CS({
+CK(0, RGB(3, 1, 6)),
+CK(0.55, RGB(8, 3, 15)),
+CK(0.85, RGB(30, 10, 58)),
+CK(1, RGB(62, 16, 118)),
+}),
+}, HubBackground)
+local HubStroke = Create("UIStroke", { Color = WHITE, Thickness = 1.8, Transparency = 0 }, Hub)
+Create("UIGradient", {
+Rotation = 45,
+Color = CS({
+CK(0, PURPLE),
+CK(0.5, LIGHT_PURPLE),
+CK(1, DEEP_PURPLE),
+}),
+}, HubStroke)
+local Header = Create("Frame", {
+Name = "Header",
+Size = U2(1, 0, 0, 44),
+BackgroundTransparency = 1,
+Active = true,
+ZIndex = 11,
+}, Hub)
+local HubTitle = Create("TextLabel", {
+Name = "HubTitle",
+Position = UO(16, 0),
+Size = U2(0.6, 0, 1, 0),
+BackgroundTransparency = 1,
+Text = "MODO PVP",
+TextColor3 = WHITE,
+TextSize = 25,
+Font = TITLE_FONT,
+TextXAlignment = LEFT,
+ZIndex = 12,
+}, Header)
+Create("UIStroke", { Color = PURPLE, Thickness = 1, Transparency = 0.5 }, HubTitle)
+Create("UIGradient", {
+Rotation = 90,
+Color = CS({
+CK(0, WHITE),
+CK(1, RGB(190, 140, 255)),
+}),
+}, HubTitle)
+local function HeaderButton(name, text, offsetX)
+local button = Create("TextButton", {
+Name = name,
+AnchorPoint = V2(1, 0.5),
+Position = U2(1, offsetX, 0.5, 0),
+Size = UO(30, 30),
+BackgroundColor3 = Theme.RowBg,
+AutoButtonColor = false,
+Text = text,
+TextColor3 = Theme.Text,
+TextSize = 15,
+Font = BODY_BOLD,
+ZIndex = 13,
+}, Header)
+AddCorner(button, 8)
+local stroke = Create("UIStroke", { Color = Theme.Stroke, Transparency = 0.5, Thickness = 1 }, button)
+local scale = Create("UIScale", { Scale = 1 }, button)
+Connect(button.MouseEnter, function()
+Tween(button, 0.2, { BackgroundColor3 = Theme.RowHover })
+Tween(stroke, 0.2, { Transparency = 0.1 })
+end)
+Connect(button.MouseLeave, function()
+Tween(button, 0.25, { BackgroundColor3 = Theme.RowBg })
+Tween(stroke, 0.25, { Transparency = 0.5 })
+end)
+Connect(button.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(scale, 0.08, { Scale = 0.92 }, ES.Quad, ED.Out)
+end
+end)
+Connect(button.InputEnded, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(scale, 0.18, { Scale = 1 }, ES.Back, ED.Out)
+end
+end)
+return button
+end
+local CloseButton = HeaderButton("Close", "X", -10)
+local MinimizeButton = HeaderButton("Minimize", "—", -46)
+local TabNames = { "HITBOX", "AIMBOT", "ESP", "PONTOS ESTRATÉGICOS" }
+local TabWeights = { 0.2, 0.2, 0.14, 0.46 } -- "PONTOS ESTRATÉGICOS" precisa de mais largura (uma linha só)
+local TabStarts = {}
+do
+local acc = 0
+for i, weight in ipairs(TabWeights) do
+TabStarts[i] = acc
+acc += weight
+end
+end
+local TabBar = Create("Frame", {
+Name = "TabBar",
+Position = UO(12, 46),
+Size = U2(1, -24, 0, 32),
+BackgroundTransparency = 1,
+ZIndex = 11,
+}, Hub)
+local TabLine = Create("Frame", {
+Name = "TabLine",
+Position = UO(12, 79),
+Size = U2(1, -24, 0, 1),
+BackgroundColor3 = LAVENDER,
+ZIndex = 11,
+}, Hub)
+Create("UIGradient", {
+Transparency = NS({
+NK(0, 1),
+NK(0.5, 0.25),
+NK(1, 1),
+}),
+}, TabLine)
+local Indicator = Create("Frame", {
+Name = "Indicator",
+Position = U2(TabStarts[1], 6, 1, -2),
+Size = U2(TabWeights[1], -12, 0, 2),
+BackgroundColor3 = LIGHT_PURPLE,
+ZIndex = 13,
+}, TabBar)
+AddCorner(Indicator, 2)
+local PageHolder = Create("Frame", {
+Name = "PageHolder",
+Position = UO(12, 88),
+Size = U2(1, -24, 1, -98),
+BackgroundTransparency = 1,
+ClipsDescendants = true,
+ZIndex = 11,
+}, Hub)
+local function CreatePage()
+local page = Create("ScrollingFrame", {
+Size = US(1, 1),
+BackgroundTransparency = 1,
+ScrollBarThickness = 3,
+ScrollBarImageColor3 = PURPLE,
+CanvasSize = U2(0, 0, 0, 0),
+AutomaticCanvasSize = AS.Y,
+ScrollingDirection = Enum.ScrollingDirection.Y,
+Visible = false,
+ZIndex = 12,
+}, PageHolder)
+Create("UIListLayout", {
+Padding = UD(0, 8),
+SortOrder = Enum.SortOrder.LayoutOrder,
+}, page)
+Create("UIPadding", {
+PaddingRight = UD(0, 8),
+PaddingBottom = UD(0, 8),
+PaddingTop = UD(0, 2),
+}, page)
+return page
+end
+local function AddSection(page, text)
+Create("TextLabel", {
+Size = U2(1, 0, 0, 18),
+BackgroundTransparency = 1,
+Text = text,
+TextColor3 = LIGHT_PURPLE,
+TextSize = 11,
+Font = BODY_BOLD,
+TextXAlignment = LEFT,
+LayoutOrder = NextOrder(),
+ZIndex = 12,
+}, page)
+end
+local function AddRow(parent, height)
+local row = Create("Frame", {
+Size = U2(1, 0, 0, height),
+BackgroundColor3 = Theme.RowBg,
+LayoutOrder = NextOrder(),
+ZIndex = 12,
+}, parent)
+AddCorner(row, 9)
+local stroke = Create("UIStroke", { Color = Theme.Stroke, Transparency = 0.55, Thickness = 1 }, row)
+return row, stroke
+end
+local function RowLabel(row, text, y, size, color, font, width)
+return Create("TextLabel", {
+Position = UO(12, y),
+Size = width or U2(1, -76, 0, size + 4),
+BackgroundTransparency = 1,
+Text = text,
+TextColor3 = color,
+TextSize = size,
+Font = font,
+TextXAlignment = LEFT,
+TextTruncate = Enum.TextTruncate.AtEnd,
+ZIndex = 13,
+}, row)
+end
+local function HoverRow(row, trigger)
+Connect(trigger.MouseEnter, function()
+Tween(row, 0.2, { BackgroundColor3 = Theme.RowHover })
+end)
+Connect(trigger.MouseLeave, function()
+Tween(row, 0.25, { BackgroundColor3 = Theme.RowBg })
+end)
+end
+local function BindDrag(hit, page, update)
+local dragging = false
+Connect(hit.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+dragging = true
+page.ScrollingEnabled = false
+update(input.Position.X)
+end
+end)
+Connect(UserInputService.InputChanged, function(input)
+if dragging and (input.UserInputType == UIT.MouseMovement
+or input.UserInputType == UIT.Touch) then
+update(input.Position.X)
+end
+end)
+Connect(UserInputService.InputEnded, function(input)
+if dragging and (input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch) then
+dragging = false
+page.ScrollingEnabled = true
+end
+end)
+end
+local function AddToggle(page, title, description, default, callback)
+local row, stroke = AddRow(page, 52)
+RowLabel(row, title, 7, 13, Theme.Text, BODY_BOLD)
+RowLabel(row, description, 27, 12, Theme.Muted, BODY)
+local track = Create("Frame", {
+AnchorPoint = V2(1, 0.5),
+Position = U2(1, -12, 0.5, 0),
+Size = UO(40, 20),
+BackgroundColor3 = Theme.Off,
+ZIndex = 13,
+}, row)
+AddCorner(track, 20)
+local knob = Create("Frame", {
+AnchorPoint = V2(0, 0.5),
+Position = U2(0, 3, 0.5, 0),
+Size = UO(14, 14),
+BackgroundColor3 = WHITE,
+ZIndex = 14,
+}, track)
+AddCorner(knob, 20)
+local button = Create("TextButton", {
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = "",
+ZIndex = 15,
+}, row)
+HoverRow(row, button)
+local state = false
+local function Set(value)
+state = value and true or false
+Tween(track, 0.22, { BackgroundColor3 = state and PURPLE or Theme.Off }, ES.Quint, ED.Out)
+Tween(knob, 0.22, {
+Position = state and U2(1, -17, 0.5, 0) or U2(0, 3, 0.5, 0),
+}, ES.Back, ED.Out)
+Tween(stroke, 0.22, {
+Color = state and LIGHT_PURPLE or Theme.Stroke,
+Transparency = state and 0.15 or 0.55,
+})
+callback(state)
+end
+Connect(button.MouseButton1Click, function()
+Set(not state)
+end)
+Set(default)
+return Set
+end
+local function AddSlider(page, title, minValue, maxValue, default, step, format, callback)
+local row = AddRow(page, 58)
+RowLabel(row, title, 7, 13, Theme.Text, BODY_BOLD, U2(1, -90, 0, 18))
+local valueLabel = Create("TextLabel", {
+AnchorPoint = V2(1, 0),
+Position = U2(1, -12, 0, 7),
+Size = UO(70, 18),
+BackgroundTransparency = 1,
+Text = "",
+TextColor3 = LIGHT_PURPLE,
+TextSize = 13,
+Font = BODY_BOLD,
+TextXAlignment = RIGHT,
+ZIndex = 13,
+}, row)
+local track = Create("Frame", {
+Position = U2(0, 12, 0, 38),
+Size = U2(1, -24, 0, 6),
+BackgroundColor3 = Theme.Off,
+ZIndex = 13,
+}, row)
+AddCorner(track, 6)
+local fill = Create("Frame", {
+Size = US(0, 1),
+BackgroundColor3 = PURPLE,
+ZIndex = 14,
+}, track)
+AddCorner(fill, 6)
+Create("UIGradient", {
+Color = CS(DEEP_PURPLE, LIGHT_PURPLE),
+}, fill)
+local knob = Create("Frame", {
+AnchorPoint = V2(0.5, 0.5),
+Position = US(0, 0.5),
+Size = UO(14, 14),
+BackgroundColor3 = WHITE,
+ZIndex = 15,
+}, track)
+AddCorner(knob, 14)
+local hit = Create("TextButton", {
+Position = U2(0, 6, 0, 26),
+Size = U2(1, -12, 0, 30),
+BackgroundTransparency = 1,
+Text = "",
+ZIndex = 16,
+}, row)
+local function Set(value)
+value = math.clamp(value, minValue, maxValue)
+value = math.floor(value / step + 0.5) * step
+value = math.clamp(value, minValue, maxValue)
+local alpha = (value - minValue) / (maxValue - minValue)
+Tween(fill, 0.1, { Size = US(alpha, 1) }, ES.Quad, ED.Out)
+Tween(knob, 0.1, { Position = US(alpha, 0.5) }, ES.Quad, ED.Out)
+valueLabel.Text = format(value)
+callback(value)
+end
+BindDrag(hit, page, function(x)
+local alpha = math.clamp((x - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
+Set(minValue + (maxValue - minValue) * alpha)
+end)
+Connect(hit.MouseEnter, function()
+Tween(knob, 0.15, { Size = UO(17, 17) })
+end)
+Connect(hit.MouseLeave, function()
+Tween(knob, 0.2, { Size = UO(14, 14) })
+end)
+Set(default)
+return Set
+end
+local function AddColorPicker(page, title, default, callback)
+local row = AddRow(page, 96)
+RowLabel(row, title, 7, 13, Theme.Text, BODY_BOLD, U2(1, -70, 0, 18))
+local preview = Create("Frame", {
+AnchorPoint = V2(1, 0),
+Position = U2(1, -12, 0, 8),
+Size = UO(38, 16),
+BackgroundColor3 = default,
+ZIndex = 13,
+}, row)
+AddCorner(preview, 8)
+Create("UIStroke", { Color = WHITE, Transparency = 0.6, Thickness = 1 }, preview)
+local hueTrack = Create("Frame", {
+Position = U2(0, 12, 0, 36),
+Size = U2(1, -24, 0, 10),
+BackgroundColor3 = WHITE,
+ZIndex = 13,
+}, row)
+AddCorner(hueTrack, 6)
+local keypoints = {}
+for i = 0, 6 do
+table.insert(keypoints, CK(i / 6, Color3.fromHSV(i / 6 % 1 == 0 and (i == 6 and 0.999 or 0) or i / 6, 0.85, 1)))
+end
+Create("UIGradient", { Color = CS(keypoints) }, hueTrack)
+local hueKnob = Create("Frame", {
+AnchorPoint = V2(0.5, 0.5),
+Position = US(0, 0.5),
+Size = UO(14, 14),
+BackgroundColor3 = default,
+ZIndex = 15,
+}, hueTrack)
+AddCorner(hueKnob, 14)
+Create("UIStroke", { Color = WHITE, Thickness = 2 }, hueKnob)
+local hueHit = Create("TextButton", {
+Position = U2(0, 6, 0, 28),
+Size = U2(1, -12, 0, 26),
+BackgroundTransparency = 1,
+Text = "",
+ZIndex = 16,
+}, row)
+local function SetColor(color, moveKnob)
+preview.BackgroundColor3 = color
+hueKnob.BackgroundColor3 = color
+if moveKnob then
+local h = color:ToHSV()
+Tween(hueKnob, 0.15, { Position = US(h, 0.5) }, ES.Quad, ED.Out)
+end
+callback(color)
+end
+BindDrag(hueHit, page, function(x)
+local alpha = math.clamp((x - hueTrack.AbsolutePosition.X) / math.max(hueTrack.AbsoluteSize.X, 1), 0, 1)
+hueKnob.Position = US(alpha, 0.5)
+SetColor(Color3.fromHSV(math.min(alpha, 0.999), 0.85, 1), false)
+end)
+local swatches = {
+PURPLE,
+RGB(255, 70, 110),
+RGB(255, 150, 60),
+RGB(255, 225, 70),
+RGB(70, 230, 140),
+RGB(70, 200, 255),
+RGB(90, 110, 255),
+WHITE,
+}
+local swatchRow = Create("Frame", {
+Position = UO(12, 60),
+Size = U2(1, -24, 0, 26),
+BackgroundTransparency = 1,
+ZIndex = 13,
+}, row)
+for i, color in ipairs(swatches) do
+local cell = Create("Frame", {
+Position = US((i - 1) / #swatches, 0),
+Size = US(1 / #swatches, 1),
+BackgroundTransparency = 1,
+ZIndex = 13,
+}, swatchRow)
+Create("UIPadding", {
+PaddingLeft = UD(0, 3), PaddingRight = UD(0, 3),
+}, cell)
+local swatch = Create("TextButton", {
+Size = US(1, 1),
+BackgroundColor3 = color,
+AutoButtonColor = false,
+Text = "",
+ZIndex = 14,
+}, cell)
+AddCorner(swatch, 7)
+local stroke = Create("UIStroke", { Color = WHITE, Transparency = 0.75, Thickness = 1 }, swatch)
+local scale = Create("UIScale", { Scale = 1 }, swatch)
+Connect(swatch.MouseEnter, function()
+Tween(scale, 0.15, { Scale = 1.1 }, ES.Quint, ED.Out)
+Tween(stroke, 0.15, { Transparency = 0.2 })
+end)
+Connect(swatch.MouseLeave, function()
+Tween(scale, 0.2, { Scale = 1 }, ES.Quint, ED.Out)
+Tween(stroke, 0.2, { Transparency = 0.75 })
+end)
+Connect(swatch.MouseButton1Click, function()
+scale.Scale = 0.9
+Tween(scale, 0.2, { Scale = 1 }, ES.Back, ED.Out)
+SetColor(color, true)
+end)
+end
+task.defer(function()
+SetColor(default, true)
+end)
+end
+local function AddSelector(page, title, options, default, callback)
+local row = AddRow(page, 52)
+RowLabel(row, title, 0, 13, Theme.Text, BODY_BOLD, U2(0.4, 0, 1, 0))
+local count = #options
+local holder = Create("Frame", {
+AnchorPoint = V2(1, 0.5),
+Position = U2(1, -12, 0.5, 0),
+Size = UO(count * 78, 30),
+BackgroundColor3 = RGB(8, 4, 14),
+ZIndex = 13,
+}, row)
+AddCorner(holder, 8)
+Create("UIStroke", { Color = Theme.Stroke, Transparency = 0.6, Thickness = 1 }, holder)
+local highlight = Create("Frame", {
+Position = U2(0, 2, 0, 2),
+Size = U2(1 / count, -4, 1, -4),
+BackgroundColor3 = PURPLE,
+ZIndex = 14,
+}, holder)
+AddCorner(highlight, 6)
+Create("UIGradient", { Color = CS(PURPLE, DEEP_PURPLE), Rotation = 90 }, highlight)
+local buttons = {}
+local function Select(index)
+Tween(highlight, 0.25, {
+Position = U2((index - 1) / count, 2, 0, 2),
+}, ES.Quint, ED.Out)
+for i, button in ipairs(buttons) do
+Tween(button, 0.2, { TextColor3 = (i == index) and WHITE or Theme.Muted })
+end
+callback(options[index])
+end
+for i, option in ipairs(options) do
+local button = Create("TextButton", {
+Position = US((i - 1) / count, 0),
+Size = US(1 / count, 1),
+BackgroundTransparency = 1,
+Text = option,
+TextColor3 = Theme.Muted,
+TextSize = 12,
+Font = BODY_BOLD,
+AutoButtonColor = false,
+ZIndex = 15,
+}, holder)
+Connect(button.MouseButton1Click, function()
+Select(i)
+end)
+table.insert(buttons, button)
+end
+local defaultIndex = table.find(options, default) or 1
+Select(defaultIndex)
+end
+local function AddButton(parent, text, callback)
+local button = Create("TextButton", {
+Size = U2(1, 0, 0, 38),
+BackgroundColor3 = Theme.RowHover,
+AutoButtonColor = false,
+Text = text,
+TextColor3 = Theme.Text,
+TextSize = 13,
+Font = BODY_BOLD,
+LayoutOrder = NextOrder(),
+ZIndex = 14,
+}, parent)
+AddCorner(button, 8)
+local stroke = Create("UIStroke", { Color = LIGHT_PURPLE, Transparency = 0.4, Thickness = 1 }, button)
+local scale = Create("UIScale", { Scale = 1 }, button)
+Connect(button.MouseEnter, function()
+Tween(button, 0.2, { BackgroundColor3 = RGB(86, 38, 150) })
+Tween(stroke, 0.2, { Transparency = 0.05 })
+end)
+Connect(button.MouseLeave, function()
+Tween(button, 0.25, { BackgroundColor3 = Theme.RowHover })
+Tween(stroke, 0.25, { Transparency = 0.4 })
+end)
+Connect(button.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(scale, 0.08, { Scale = 0.97 }, ES.Quad, ED.Out)
+end
+end)
+Connect(button.InputEnded, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(scale, 0.18, { Scale = 1 }, ES.Back, ED.Out)
+end
+end)
+Connect(button.MouseButton1Click, function()
+button.BackgroundColor3 = PURPLE
+Tween(button, 0.35, { BackgroundColor3 = Theme.RowHover })
+callback()
+end)
+return button
+end
+local function AddActionRow(page, text, callback)
+local row = AddRow(page, 56)
+local button = AddButton(row, text, callback)
+button.Position = UO(12, 9)
+button.Size = U2(1, -24, 0, 38)
+return row, button
+end
+local Pages = {}
+local TabButtons = {}
+local ActiveTab = 0
+local function SelectTab(index)
+if index == ActiveTab then
+return
+end
+ActiveTab = index
+for i, page in ipairs(Pages) do
+page.Visible = (i == index)
+end
+for i, button in ipairs(TabButtons) do
+Tween(button, 0.25, { TextColor3 = (i == index) and WHITE or Theme.Muted })
+end
+Tween(Indicator, 0.35, {
+Position = U2(TabStarts[index], 6, 1, -2),
+Size = U2(TabWeights[index], -12, 0, 2),
+}, ES.Quint, ED.Out)
+local page = Pages[index]
+page.Position = UO(0, 14)
+Tween(page, 0.35, { Position = UO(0, 0) }, ES.Quint, ED.Out)
+end
+for i, name in ipairs(TabNames) do
+local button = Create("TextButton", {
+Name = "Tab" .. i,
+Position = US(TabStarts[i], 0),
+Size = US(TabWeights[i], 1),
+BackgroundTransparency = 1,
+Text = name,
+TextColor3 = Theme.Muted,
+TextSize = 12,
+TextScaled = true,
+TextWrapped = false,
+Font = BODY_BOLD,
+AutoButtonColor = false,
+ZIndex = 12,
+}, TabBar)
+Create("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 7 }, button)
+Create("UIPadding", { PaddingLeft = UD(0, 4), PaddingRight = UD(0, 4) }, button)
+Connect(button.MouseEnter, function()
+if ActiveTab ~= i then
+Tween(button, 0.15, { TextColor3 = LAVENDER })
+end
+end)
+Connect(button.MouseLeave, function()
+if ActiveTab ~= i then
+Tween(button, 0.2, { TextColor3 = Theme.Muted })
+end
+end)
+Connect(button.MouseButton1Click, function()
+SelectTab(i)
+end)
+table.insert(TabButtons, button)
+table.insert(Pages, CreatePage())
+end
+local PageHitbox, PageAimbot, PageESP, PagePoints = Pages[1], Pages[2], Pages[3], Pages[4]
+-- Janela de cópia manual (usada quando o executor não tem setclipboard)
+local CopyModal = Create("Frame", {
+Name = "CopyModal",
+Size = US(1, 1),
+BackgroundColor3 = RGB(4, 2, 8),
+BackgroundTransparency = 0.12,
+Visible = false,
+Active = true,
+ZIndex = 40,
+}, Hub)
+Create("TextLabel", {
+Position = UO(16, 52),
+Size = U2(1, -32, 0, 18),
+BackgroundTransparency = 1,
+Text = "Selecione tudo e copie (Ctrl+C / segurar e copiar):",
+TextColor3 = Theme.Muted,
+TextSize = 12,
+Font = BODY,
+TextXAlignment = LEFT,
+ZIndex = 41,
+}, CopyModal)
+local CopyBox = Create("TextBox", {
+Position = UO(16, 74),
+Size = U2(1, -32, 1, -130),
+BackgroundColor3 = Theme.RowBg,
+ClearTextOnFocus = false,
+MultiLine = true,
+TextEditable = true,
+Text = "",
+TextColor3 = Theme.Text,
+TextSize = 12,
+Font = FNT.Code,
+TextXAlignment = LEFT,
+TextYAlignment = TYA.Top,
+ZIndex = 41,
+}, CopyModal)
+AddCorner(CopyBox, 8)
+Create("UIStroke", { Color = Theme.Stroke, Transparency = 0.4, Thickness = 1 }, CopyBox)
+Create("UIPadding", {
+PaddingLeft = UD(0, 8), PaddingTop = UD(0, 6),
+}, CopyBox)
+local CloseCopy = Create("TextButton", {
+AnchorPoint = V2(0.5, 1),
+Position = U2(0.5, 0, 1, -14),
+Size = UO(120, 32),
+BackgroundColor3 = Theme.RowHover,
+AutoButtonColor = false,
+Text = "Fechar",
+TextColor3 = Theme.Text,
+TextSize = 13,
+Font = BODY_BOLD,
+ZIndex = 41,
+}, CopyModal)
+AddCorner(CloseCopy, 8)
+Create("UIStroke", { Color = LIGHT_PURPLE, Transparency = 0.4, Thickness = 1 }, CloseCopy)
+Connect(CloseCopy.MouseButton1Click, function()
+CopyModal.Visible = false
+end)
+local function ShowCopy(text, successMessage)
+local copied = pcall(function()
+setclipboard(text)
+end)
+if copied then
+Notify(successMessage or "Copiado")
+else
+CopyBox.Text = text
+CopyModal.Visible = true
+Notify("Clipboard indisponível: copie manualmente")
+end
+end
+-- ============ HITBOX ============
+do
+local H = Settings.Hitbox
+local Originals = setmetatable({}, { __mode = "k" })
+local function Restore()
+for part, data in pairs(Originals) do
+if part.Parent then
+part.Size = data.Size
+part.Transparency = data.Transparency
+part.Color = data.Color
+part.Material = data.Material
+part.CanCollide = data.CanCollide
+part.Massless = data.Massless
+end
+Originals[part] = nil
+end
+end
+Connect(RunService.Heartbeat, function()
+if not H.Enabled then
+if next(Originals) then
+Restore()
+end
+return
+end
+local size = V3(H.Size, H.Size, H.Size)
+for _, other in ipairs(Players:GetPlayers()) do
+if other ~= Player and other.Character then
+local root = other.Character:FindFirstChild("HumanoidRootPart")
+if root and root:IsA("BasePart") then
+if not Originals[root] then
+Originals[root] = {
+Size = root.Size,
+Transparency = root.Transparency,
+Color = root.Color,
+Material = root.Material,
+CanCollide = root.CanCollide,
+Massless = root.Massless,
+}
+end
+root.Size = size
+root.Transparency = H.Transparency
+root.Color = H.Color
+root.Material = MAT.Neon
+root.CanCollide = false
+root.Massless = true
+end
+end
+end
+end)
+table.insert(Unloaders, Restore)
+AddSection(PageHitbox, "CONFIGURAÇÕES DA HITBOX")
+AddToggle(PageHitbox, "Ativar hitbox", "Expande a hitbox dos outros jogadores", false, function(value)
+H.Enabled = value
+end)
+AddColorPicker(PageHitbox, "Cor da hitbox", H.Color, function(color)
+H.Color = color
+end)
+AddSlider(PageHitbox, "Tamanho da hitbox", 2, 30, H.Size, 1, function(value)
+return value .. " studs"
+end, function(value)
+H.Size = value
+end)
+AddSlider(PageHitbox, "Transparência", 0, 1, H.Transparency, 0.05, function(value)
+return math.floor(value * 100 + 0.5) .. "%"
+end, function(value)
+H.Transparency = value
+end)
+end
+-- ============ AIMBOT ============
+do
+local A = Settings.Aimbot
+local SetPosX, SetPosY
+local FovCircle = Create("Frame", {
+Name = "FovCircle",
+AnchorPoint = V2(0.5, 0.5),
+BackgroundColor3 = PURPLE,
+BackgroundTransparency = 1,
+Size = UO(300, 300),
+Visible = false,
+ZIndex = 5,
+}, OverlayGui)
+Create("UICorner", { CornerRadius = UD(1, 0) }, FovCircle)
+Create("UIStroke", { Color = LIGHT_PURPLE, Thickness = 1.5, Transparency = 0.35 }, FovCircle)
+local FovDrag = Create("TextButton", {
+Name = "FovDrag",
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = "",
+AutoButtonColor = false,
+Visible = false,
+ZIndex = 6,
+}, FovCircle)
+local function FovCenter()
+local screen = ScreenSize()
+return V2(screen.X * A.PosX / 100, screen.Y * A.PosY / 100)
+end
+-- Arrastar o círculo do FOV direto na tela
+local fovDragging = false
+local fovDragStart = V2(0, 0)
+local fovDragOrigin = V2(0, 0)
+Connect(FovDrag.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+fovDragging = true
+fovDragStart = V2(input.Position.X, input.Position.Y)
+fovDragOrigin = FovCenter()
+local ended
+ended = input.Changed:Connect(function()
+if input.UserInputState == Enum.UserInputState.End then
+ended:Disconnect()
+fovDragging = false
+end
+end)
+end
+end)
+Connect(UserInputService.InputChanged, function(input)
+if not fovDragging then
+return
+end
+if input.UserInputType == UIT.MouseMovement
+or input.UserInputType == UIT.Touch then
+local delta = V2(input.Position.X, input.Position.Y) - fovDragStart
+local screen = ScreenSize()
+local nx = math.clamp(fovDragOrigin.X + delta.X, 0, screen.X)
+local ny = math.clamp(fovDragOrigin.Y + delta.Y, 0, screen.Y)
+if SetPosX and SetPosY then
+SetPosX(nx / screen.X * 100)
+SetPosY(ny / screen.Y * 100)
+end
+end
+end)
+local function GetAimPart(character)
+if A.Part == "Cabeça" then
+return character:FindFirstChild("Head")
+end
+return character:FindFirstChild("UpperTorso")
+or character:FindFirstChild("Torso")
+or character:FindFirstChild("HumanoidRootPart")
+end
+local function IsVisible(part, character)
+local cam = workspace.CurrentCamera
+local params = RaycastParams.new()
+params.FilterType = Enum.RaycastFilterType.Exclude
+params.FilterDescendantsInstances = { Player.Character, character }
+params.IgnoreWater = true
+local origin = cam.CFrame.Position
+return workspace:Raycast(origin, part.Position - origin, params) == nil
+end
+-- Só escolhe alvos DENTRO do círculo do FOV
+local function GetTarget(cam, center)
+local off = ScreenOffset()
+local best
+local bestDistance = A.FOV
+for _, other in ipairs(Players:GetPlayers()) do
+local character = other ~= Player and other.Character
+if character then
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+local part = GetAimPart(character)
+if humanoid and humanoid.Health > 0 and part then
+local point, onScreen = cam:WorldToViewportPoint(part.Position)
+if onScreen then
+local screenPoint = V2(point.X + off.X, point.Y + off.Y)
+local distance = (screenPoint - center).Magnitude
+if distance < bestDistance and (A.IgnoreWalls or IsVisible(part, character)) then
+best = part
+bestDistance = distance
+end
+end
+end
+end
+end
+return best
+end
+local bindName = "AngelPvPAimbot"
+RunService:BindToRenderStep(bindName, Enum.RenderPriority.Camera.Value + 1, function(dt)
+local cam = workspace.CurrentCamera
+if not cam then
+return
+end
+local center = FovCenter()
+FovCircle.Visible = (A.Enabled and A.ShowFOV) or A.DragMode
+FovCircle.Size = UO(A.FOV * 2, A.FOV * 2)
+FovCircle.Position = UO(center.X, center.Y)
+FovCircle.BackgroundTransparency = A.DragMode and 0.88 or 1
+FovDrag.Visible = A.DragMode
+if not A.Enabled then
+return
+end
+if A.HoldRMB and UserInputService.MouseEnabled
+and not UserInputService:IsMouseButtonPressed(UIT.MouseButton2) then
+return
+end
+local target = GetTarget(cam, center)
+if not target then
+return
+end
+-- Gira a câmera para o alvo ficar exatamente no centro do FOV (mira da arma)
+local origin = cam.CFrame.Position
+local off = ScreenOffset()
+local viewPoint = center - V2(off.X, off.Y)
+local aimRay = cam:ViewportPointToRay(viewPoint.X, viewPoint.Y).Direction
+local toTarget = (target.Position - origin).Unit
+local look = cam.CFrame.LookVector
+local axis = aimRay:Cross(toTarget)
+local angle = 0
+if axis.Magnitude > 1e-5 then
+angle = math.acos(math.clamp(aimRay:Dot(toTarget), -1, 1))
+look = CFrame.fromAxisAngle(axis.Unit, angle):VectorToWorldSpace(look)
+end
+-- Longe: o alvo é pequeno e qualquer erro de mira vira "fora". Reduz a suavidade com a distância
+local distance = (target.Position - origin).Magnitude
+local farBoost = math.clamp((distance - 40) / 120, 0, 1) -- 0 perto ... 1 longe (160+ studs)
+local smooth = (A.Smooth / 100) * (1 - 0.9 * farBoost)
+local alpha = 1 - smooth * 0.98
+alpha = 1 - (1 - alpha) ^ (math.clamp(dt, 0, 0.1) * 60)
+-- Erro pequeno: trava exato no alvo (sem sobra de suavização)
+if angle < 0.01 then
+alpha = 1
+end
+local goal = CFrame.lookAt(origin, origin + look)
+cam.CFrame = cam.CFrame:Lerp(goal, math.clamp(alpha, 0, 1))
+end)
+table.insert(Unloaders, function()
+RunService:UnbindFromRenderStep(bindName)
+end)
+AddSection(PageAimbot, "MIRA")
+AddToggle(PageAimbot, "Ativar aimbot", "Puxa a mira para o jogador dentro do FOV", false, function(value)
+A.Enabled = value
+end)
+AddSlider(PageAimbot, "Suavidade", 0, 100, A.Smooth, 1, function(value)
+return value .. "%"
+end, function(value)
+A.Smooth = value
+end)
+AddSlider(PageAimbot, "Tamanho do FOV (raio)", 40, 400, A.FOV, 5, function(value)
+return value .. " px"
+end, function(value)
+A.FOV = value
+end)
+AddSection(PageAimbot, "POSIÇÃO DO FOV (MIRA DA ARMA)")
+AddToggle(PageAimbot, "Arrastar FOV na tela", "Minimize o menu e arraste o círculo até a mira", A.DragMode, function(value)
+A.DragMode = value
+end)
+SetPosX = AddSlider(PageAimbot, "Posição horizontal", 0, 100, A.PosX, 0.1, function(value)
+return string.format("%.1f%%", value)
+end, function(value)
+A.PosX = value
+end)
+SetPosY = AddSlider(PageAimbot, "Posição vertical", 0, 100, A.PosY, 0.1, function(value)
+return string.format("%.1f%%", value)
+end, function(value)
+A.PosY = value
+end)
+-- (Botão temporário: pode ser removido depois de enviar a localização)
+AddActionRow(PageAimbot, "Copiar localização do FOV", function()
+local screen = ScreenSize()
+local center = FovCenter()
+local off = ScreenOffset()
+local text = string.format(
+"FOV_X: %.1f%%\nFOV_Y: %.1f%%\nCentro: %d, %d px\nRaio: %d px\nTela: %d x %d\nCompensação: %.1f, %.1f\nAutoAlign: %s",
+A.PosX, A.PosY,
+math.floor(center.X + 0.5), math.floor(center.Y + 0.5),
+A.FOV,
+math.floor(screen.X + 0.5), math.floor(screen.Y + 0.5),
+off.X, off.Y,
+tostring(Settings.AutoAlign)
+)
+ShowCopy(text, "Localização do FOV copiada")
+end)
+AddSection(PageAimbot, "OPÇÕES")
+AddToggle(PageAimbot, "Ignorar paredes", "Mira mesmo com obstáculos na frente", A.IgnoreWalls, function(value)
+A.IgnoreWalls = value
+end)
+AddToggle(PageAimbot, "Mostrar FOV", "Círculo do campo de visão na tela", A.ShowFOV, function(value)
+A.ShowFOV = value
+end)
+AddToggle(PageAimbot, "Só com botão direito", "PC: mira apenas segurando o botão direito", A.HoldRMB, function(value)
+A.HoldRMB = value
+end)
+AddSelector(PageAimbot, "Parte do alvo", { "Cabeça", "Peito" }, A.Part, function(value)
+A.Part = value
+end)
+end
+-- ============ ESP ============
+do
+local E = Settings.ESP
+local Objects = {}
+local Folder = Create("Folder", { Name = "ESP" }, OverlayGui)
+local R15 = {
+{ "Head", "UpperTorso" }, { "UpperTorso", "LowerTorso" },
+{ "UpperTorso", "LeftUpperArm" }, { "LeftUpperArm", "LeftLowerArm" }, { "LeftLowerArm", "LeftHand" },
+{ "UpperTorso", "RightUpperArm" }, { "RightUpperArm", "RightLowerArm" }, { "RightLowerArm", "RightHand" },
+{ "LowerTorso", "LeftUpperLeg" }, { "LeftUpperLeg", "LeftLowerLeg" }, { "LeftLowerLeg", "LeftFoot" },
+{ "LowerTorso", "RightUpperLeg" }, { "RightUpperLeg", "RightLowerLeg" }, { "RightLowerLeg", "RightFoot" },
+}
+local R6 = {
+{ "Head", "Torso" }, { "Torso", "Left Arm" }, { "Torso", "Right Arm" },
+{ "Torso", "Left Leg" }, { "Torso", "Right Leg" },
+}
+local function NewLine(parent)
+return Create("Frame", {
+AnchorPoint = V2(0.5, 0.5),
+BackgroundColor3 = LIGHT_PURPLE,
+Visible = false,
+ZIndex = 2,
+}, parent)
+end
+local function SetLine(line, a, b, thickness)
+local delta = b - a
+line.Size = UO(delta.Magnitude, thickness)
+line.Position = UO((a.X + b.X) / 2, (a.Y + b.Y) / 2)
+line.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+line.Visible = true
+end
+local function CreateObject(other)
+local holder = Create("Folder", { Name = other.Name }, Folder)
+local object = { Holder = holder, Bones = {} }
+object.Name = Create("TextLabel", {
+AnchorPoint = V2(0.5, 1),
+Size = UO(220, 16),
+BackgroundTransparency = 1,
+Text = "",
+TextColor3 = WHITE,
+TextSize = 12,
+Font = BODY_BOLD,
+Visible = false,
+ZIndex = 4,
+}, holder)
+Create("UIStroke", { Color = BLACK, Thickness = 1, Transparency = 0.2 }, object.Name)
+object.Box = Create("Frame", {
+BackgroundTransparency = 1,
+Visible = false,
+ZIndex = 2,
+}, holder)
+Create("UIStroke", { Color = LIGHT_PURPLE, Thickness = 1.5 }, object.Box)
+object.HealthBack = Create("Frame", {
+BackgroundColor3 = RGB(10, 5, 18),
+Visible = false,
+ZIndex = 2,
+}, holder)
+object.HealthFill = Create("Frame", {
+AnchorPoint = V2(0, 1),
+Position = US(0, 1),
+Size = US(1, 1),
+BackgroundColor3 = RGB(80, 255, 140),
+ZIndex = 3,
+}, object.HealthBack)
+object.Tracer = NewLine(holder)
+for i = 1, #R15 do
+object.Bones[i] = NewLine(holder)
+end
+Objects[other] = object
+end
+local function HideDrawings(object)
+object.Name.Visible = false
+object.Box.Visible = false
+object.HealthBack.Visible = false
+object.Tracer.Visible = false
+for _, bone in ipairs(object.Bones) do
+bone.Visible = false
+end
+end
+-- Holograma: preenchimento colorido visível através das paredes
+local function SetHolo(object, character, on)
+local hl = object.Holo
+if on and character then
+if not hl or hl.Parent ~= character then
+if hl then
+hl:Destroy()
+end
+hl = Instance.new("Highlight")
+hl.Name = "AngelHolo"
+hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+hl.Adornee = character
+hl.Parent = character
+object.Holo = hl
+end
+hl.FillColor = E.HoloColor
+hl.OutlineColor = E.HoloColor:Lerp(WHITE, 0.35)
+hl.FillTransparency = E.HoloTransparency
+hl.OutlineTransparency = 0.05
+hl.Enabled = true
+elseif hl then
+hl.Enabled = false
+end
+end
+local function HideObject(object)
+HideDrawings(object)
+SetHolo(object, nil, false)
+end
+local function DestroyObject(object)
+if object.Holo then
+object.Holo:Destroy()
+object.Holo = nil
+end
+object.Holder:Destroy()
+end
+local function UpdateObject(other, object, cam, screen)
+local character = other.Character
+local root = character and character:FindFirstChild("HumanoidRootPart")
+local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+if not (E.Enabled and root and humanoid and humanoid.Health > 0) then
+HideObject(object)
+return
+end
+SetHolo(object, character, E.Hologram)
+local extra = V2(E.OffX, E.OffY)
+local rootPoint = W2S(cam, root.Position, extra)
+if rootPoint.Z <= 0 then
+HideDrawings(object)
+return
+end
+local topPoint = W2S(cam, root.Position + V3(0, 2.9, 0), extra)
+local bottomPoint = W2S(cam, root.Position - V3(0, 3.2, 0), extra)
+local height = math.max(bottomPoint.Y - topPoint.Y, 4)
+local width = height * 0.58
+local left = rootPoint.X - width / 2
+if E.Box then
+object.Box.Position = UO(left, topPoint.Y)
+object.Box.Size = UO(width, height)
+object.Box.Visible = true
+else
+object.Box.Visible = false
+end
+if E.Health then
+local ratio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+object.HealthBack.Position = UO(left - 6, topPoint.Y)
+object.HealthBack.Size = UO(3, height)
+object.HealthFill.Size = US(1, ratio)
+object.HealthFill.BackgroundColor3 = RGB(255, 80, 90):Lerp(RGB(80, 255, 140), ratio)
+object.HealthBack.Visible = true
+else
+object.HealthBack.Visible = false
+end
+if E.Name or E.Distance then
+local text = ""
+if E.Name then
+text = other.DisplayName
+end
+if E.Distance then
+local distance = math.floor((cam.CFrame.Position - root.Position).Magnitude + 0.5)
+text = (text ~= "" and (text .. " ") or "") .. "[" .. distance .. "]"
+end
+object.Name.Text = text
+object.Name.Position = UO(rootPoint.X, topPoint.Y - 2)
+object.Name.Visible = true
+else
+object.Name.Visible = false
+end
+if E.Tracers then
+SetLine(object.Tracer, V2(screen.X / 2, screen.Y), V2(rootPoint.X, rootPoint.Y), 1.2)
+else
+object.Tracer.Visible = false
+end
+local pairsList = (humanoid.RigType == Enum.HumanoidRigType.R15) and R15 or R6
+for i, bone in ipairs(object.Bones) do
+local drawn = false
+local pair = pairsList[i]
+if E.Skeleton and pair then
+local partA = character:FindFirstChild(pair[1])
+local partB = character:FindFirstChild(pair[2])
+if partA and partB then
+local pa = W2S(cam, partA.Position, extra)
+local pb = W2S(cam, partB.Position, extra)
+if pa.Z > 0 and pb.Z > 0 then
+SetLine(bone, V2(pa.X, pa.Y), V2(pb.X, pb.Y), 1.5)
+drawn = true
+end
+end
+end
+if not drawn then
+bone.Visible = false
+end
+end
+end
+for _, other in ipairs(Players:GetPlayers()) do
+if other ~= Player then
+CreateObject(other)
+end
+end
+Connect(Players.PlayerAdded, function(other)
+if other ~= Player and not Objects[other] then
+CreateObject(other)
+end
+end)
+Connect(Players.PlayerRemoving, function(other)
+local object = Objects[other]
+if object then
+DestroyObject(object)
+Objects[other] = nil
+end
+end)
+Connect(RunService.RenderStepped, function()
+local cam = workspace.CurrentCamera
+if not cam then
+return
+end
+local screen = ScreenSize()
+for other, object in pairs(Objects) do
+UpdateObject(other, object, cam, screen)
+end
+end)
+table.insert(Unloaders, function()
+for _, object in pairs(Objects) do
+if object.Holo then
+object.Holo:Destroy()
+object.Holo = nil
+end
+end
+end)
+AddSection(PageESP, "GERAL")
+AddToggle(PageESP, "Ativar ESP", "Liga ou desliga toda a visualização", false, function(value)
+E.Enabled = value
+end)
+AddSection(PageESP, "HOLOGRAMA")
+AddToggle(PageESP, "Holograma", "Jogador colorido, visível através das paredes", E.Hologram, function(value)
+E.Hologram = value
+end)
+AddColorPicker(PageESP, "Cor do holograma", E.HoloColor, function(color)
+E.HoloColor = color
+end)
+AddSlider(PageESP, "Transparência do holograma", 0, 0.95, E.HoloTransparency, 0.05, function(value)
+return math.floor(value * 100 + 0.5) .. "%"
+end, function(value)
+E.HoloTransparency = value
+end)
+AddSection(PageESP, "ELEMENTOS")
+AddToggle(PageESP, "Skeleton", "Esqueleto dos jogadores", E.Skeleton, function(value)
+E.Skeleton = value
+end)
+AddToggle(PageESP, "Name", "Nome acima do jogador", E.Name, function(value)
+E.Name = value
+end)
+AddToggle(PageESP, "Tracers", "Linhas da base da tela até os jogadores", E.Tracers, function(value)
+E.Tracers = value
+end)
+AddToggle(PageESP, "Box", "Caixa ao redor do jogador", E.Box, function(value)
+E.Box = value
+end)
+AddToggle(PageESP, "Distância", "Distância em studs junto ao nome", E.Distance, function(value)
+E.Distance = value
+end)
+AddToggle(PageESP, "Vida", "Barra de vida lateral", E.Health, function(value)
+E.Health = value
+end)
+AddSection(PageESP, "ALINHAMENTO")
+AddToggle(PageESP, "Alinhar com a tela", "Compensa as bordas da tela (ESP e FOV)", Settings.AutoAlign, function(value)
+Settings.AutoAlign = value
+end)
+AddSlider(PageESP, "Ajuste fino horizontal", -150, 150, E.OffX, 1, function(value)
+return value .. " px"
+end, function(value)
+E.OffX = value
+end)
+AddSlider(PageESP, "Ajuste fino vertical", -150, 150, E.OffY, 1, function(value)
+return value .. " px"
+end, function(value)
+E.OffY = value
+end)
+end
+-- ============ PONTOS ESTRATÉGICOS ============
+do
+local Points = {}
+local PointCount = 0
+local SavedPoints = {
+{ Pos = V3(79.814, 51.58, -512.197) },
+{ Pos = V3(254.43, 71.03, -530.688) },
+{ Pos = V3(300.808, 68.95, -570.796) },
+}
+local banner = Create("Frame", {
+Size = U2(1, 0, 0, 58),
+BackgroundColor3 = WHITE,
+LayoutOrder = NextOrder(),
+ZIndex = 12,
+}, PagePoints)
+AddCorner(banner, 10)
+Create("UIGradient", {
+Rotation = 0,
+Color = CS({
+CK(0, RGB(74, 22, 138)),
+CK(0.55, RGB(22, 9, 42)),
+CK(1, RGB(6, 3, 12)),
+}),
+}, banner)
+local bannerStroke = Create("UIStroke", { Color = WHITE, Thickness = 1.3 }, banner)
+Create("UIGradient", {
+Rotation = 0,
+Color = CS({ CK(0, LIGHT_PURPLE), CK(1, DEEP_PURPLE) }),
+}, bannerStroke)
+Create("TextLabel", {
+Position = UO(16, 6),
+Size = U2(1, -120, 0, 26),
+BackgroundTransparency = 1,
+Text = "REDE DE PONTOS",
+TextColor3 = WHITE,
+TextSize = 20,
+Font = TITLE_FONT,
+TextXAlignment = LEFT,
+ZIndex = 13,
+}, banner)
+Create("TextLabel", {
+Position = UO(16, 34),
+Size = U2(1, -120, 0, 14),
+BackgroundTransparency = 1,
+Text = string.format("%02d LOCAIS  //  TELEPORTE INSTANTÂNEO", #SavedPoints),
+TextColor3 = Theme.Muted,
+TextSize = 10,
+Font = FNT.Code,
+TextXAlignment = LEFT,
+ZIndex = 13,
+}, banner)
+local bannerDot = Create("Frame", {
+AnchorPoint = V2(1, 0.5),
+Position = U2(1, -16, 0.5, 0),
+Size = UO(8, 8),
+BackgroundColor3 = RGB(80, 255, 140),
+ZIndex = 13,
+}, banner)
+AddCorner(bannerDot, 8)
+Create("TextLabel", {
+AnchorPoint = V2(1, 0.5),
+Position = U2(1, -30, 0.5, 0),
+Size = UO(60, 14),
+BackgroundTransparency = 1,
+Text = "ATIVO",
+TextColor3 = RGB(80, 255, 140),
+TextSize = 10,
+Font = FNT.Code,
+TextXAlignment = RIGHT,
+ZIndex = 13,
+}, banner)
+AddSection(PagePoints, "AVISO")
+local warning = Create("Frame", {
+Size = U2(1, 0, 0, 0),
+AutomaticSize = AS.Y,
+BackgroundColor3 = RGB(36, 22, 8),
+LayoutOrder = NextOrder(),
+ZIndex = 12,
+}, PagePoints)
+AddCorner(warning, 9)
+Create("UIStroke", { Color = Theme.Amber, Transparency = 0.25, Thickness = 1.3 }, warning)
+Create("UIGradient", {
+Rotation = 0,
+Color = CS({
+CK(0, RGB(70, 44, 10)),
+CK(1, RGB(26, 14, 34)),
+}),
+}, warning)
+Create("UIPadding", {
+PaddingTop = UD(0, 10),
+PaddingBottom = UD(0, 10),
+}, warning)
+local icon = Create("Frame", {
+Position = UO(12, 0),
+Size = UO(26, 26),
+BackgroundColor3 = Theme.Amber,
+ZIndex = 13,
+}, warning)
+AddCorner(icon, 13)
+Create("TextLabel", {
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = "!",
+TextColor3 = RGB(40, 22, 4),
+TextSize = 18,
+Font = FNT.GothamBlack,
+ZIndex = 14,
+}, icon)
+Create("TextLabel", {
+Position = UO(50, 0),
+Size = U2(1, -62, 0, 0),
+AutomaticSize = AS.Y,
+BackgroundTransparency = 1,
+Text = "Essa aba te dá pontos de teleporte para locais estratégicos. Tenha cuidado ao utilizar essas posições, pois ações suspeitas podem resultar em denúncias e punições dentro do jogo.",
+TextColor3 = RGB(255, 232, 190),
+TextSize = 12,
+Font = BODY,
+TextWrapped = true,
+TextXAlignment = LEFT,
+TextYAlignment = TYA.Top,
+ZIndex = 13,
+}, warning)
+local function FormatNumber(n)
+local s = string.format("%.3f", n)
+s = s:gsub("%.?0+$", "")
+if s == "" or s == "-" then
+return "0"
+end
+return s
+end
+local function GetRoot()
+local character = Player.Character
+local root = character and character:FindFirstChild("HumanoidRootPart")
+local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+if root and humanoid and humanoid.Health > 0 then
+return root
+end
+return nil
+end
+AddSection(PagePoints, "LOCAIS DE TELEPORTE")
+local DistLabels = {}
+local PulseTweens = {}
+local function TeleportTo(position)
+local character = Player.Character
+local root = GetRoot()
+if not (character and root) then
+Notify("Personagem indisponível")
+return false
+end
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+if humanoid and humanoid.SeatPart then
+humanoid.Sit = false
+end
+character:PivotTo(CFrame.new(position) * root.CFrame.Rotation)
+root.AssemblyLinearVelocity = V3(0, 0, 0)
+root.AssemblyAngularVelocity = V3(0, 0, 0)
+return true
+end
+local function Bracket(parent, ax, ay)
+local px = ax == 1 and -4 or 4
+local py = ay == 1 and -4 or 4
+Create("Frame", {
+AnchorPoint = V2(ax, ay),
+Position = U2(ax, px, ay, py),
+Size = UO(10, 1),
+BackgroundColor3 = LIGHT_PURPLE,
+BackgroundTransparency = 0.3,
+ZIndex = 14,
+}, parent)
+Create("Frame", {
+AnchorPoint = V2(ax, ay),
+Position = U2(ax, px, ay, py),
+Size = UO(1, 10),
+BackgroundColor3 = LIGHT_PURPLE,
+BackgroundTransparency = 0.3,
+ZIndex = 14,
+}, parent)
+end
+local function AddPointCard(i, data)
+local row = AddRow(PagePoints, 108)
+row.BackgroundColor3 = WHITE
+Create("UIGradient", {
+Rotation = 20,
+Color = CS({
+CK(0, RGB(14, 7, 26)),
+CK(0.6, RGB(26, 12, 48)),
+CK(1, RGB(54, 18, 100)),
+}),
+}, row)
+-- barra de destaque lateral
+local bar = Create("Frame", {
+Position = UO(0, 12),
+Size = U2(0, 3, 1, -24),
+BackgroundColor3 = WHITE,
+ZIndex = 13,
+}, row)
+AddCorner(bar, 2)
+Create("UIGradient", {
+Rotation = 90,
+Color = CS({ CK(0, LIGHT_PURPLE), CK(1, DEEP_PURPLE) }),
+}, bar)
+local pulse = TweenService:Create(
+bar,
+TweenInfo.new(1.4 + i * 0.15, ES.Sine, ED.InOut, -1, true),
+{ BackgroundTransparency = 0.6 }
+)
+pulse:Play()
+table.insert(PulseTweens, pulse)
+Bracket(row, 1, 0)
+Bracket(row, 0, 1)
+-- número do ponto
+local badge = Create("Frame", {
+Position = UO(16, 14),
+Size = UO(42, 42),
+BackgroundColor3 = RGB(8, 4, 16),
+ZIndex = 13,
+}, row)
+AddCorner(badge, 10)
+local badgeStroke = Create("UIStroke", { Color = WHITE, Thickness = 1.5 }, badge)
+Create("UIGradient", {
+Rotation = 45,
+Color = CS({ CK(0, LIGHT_PURPLE), CK(1, DEEP_PURPLE) }),
+}, badgeStroke)
+Create("TextLabel", {
+Size = US(1, 1),
+BackgroundTransparency = 1,
+Text = string.format("%02d", i),
+TextColor3 = WHITE,
+TextSize = 18,
+Font = FNT.Code,
+ZIndex = 14,
+}, badge)
+Create("TextLabel", {
+Position = UO(68, 13),
+Size = U2(1, -180, 0, 18),
+BackgroundTransparency = 1,
+Text = "PONTO " .. i,
+TextColor3 = Theme.Text,
+TextSize = 14,
+Font = BODY_BOLD,
+TextXAlignment = LEFT,
+ZIndex = 13,
+}, row)
+Create("TextLabel", {
+Position = UO(68, 35),
+Size = U2(1, -80, 0, 14),
+BackgroundTransparency = 1,
+Text = string.format("X %.1f   Y %.1f   Z %.1f", data.Pos.X, data.Pos.Y, data.Pos.Z),
+TextColor3 = LAVENDER,
+TextSize = 11,
+Font = FNT.Code,
+TextXAlignment = LEFT,
+TextTruncate = Enum.TextTruncate.AtEnd,
+ZIndex = 13,
+}, row)
+-- distância ao vivo
+local pill = Create("Frame", {
+AnchorPoint = V2(1, 0),
+Position = U2(1, -16, 0, 14),
+Size = UO(96, 22),
+BackgroundColor3 = RGB(8, 4, 16),
+ZIndex = 13,
+}, row)
+AddCorner(pill, 11)
+Create("UIStroke", { Color = Theme.Stroke, Transparency = 0.45, Thickness = 1 }, pill)
+local dot = Create("Frame", {
+AnchorPoint = V2(0, 0.5),
+Position = U2(0, 9, 0.5, 0),
+Size = UO(6, 6),
+BackgroundColor3 = RGB(80, 255, 140),
+ZIndex = 14,
+}, pill)
+AddCorner(dot, 6)
+local dotPulse = TweenService:Create(
+dot,
+TweenInfo.new(0.9, ES.Sine, ED.InOut, -1, true),
+{ BackgroundTransparency = 0.7 }
+)
+dotPulse:Play()
+table.insert(PulseTweens, dotPulse)
+DistLabels[i] = Create("TextLabel", {
+Position = UO(20, 0),
+Size = U2(1, -24, 1, 0),
+BackgroundTransparency = 1,
+Text = "-- studs",
+TextColor3 = LIGHT_PURPLE,
+TextSize = 10,
+Font = FNT.Code,
+TextXAlignment = LEFT,
+ZIndex = 14,
+}, pill)
+-- linha divisória
+local line = Create("Frame", {
+Position = UO(16, 64),
+Size = U2(1, -32, 0, 1),
+BackgroundColor3 = LAVENDER,
+ZIndex = 13,
+}, row)
+Create("UIGradient", {
+Transparency = NS({ NK(0, 1), NK(0.5, 0.45), NK(1, 1) }),
+}, line)
+-- botão teleportar
+local tp = Create("TextButton", {
+Position = UO(16, 72),
+Size = U2(1, -32, 0, 28),
+BackgroundColor3 = WHITE,
+AutoButtonColor = false,
+Text = "TELEPORTAR",
+TextColor3 = WHITE,
+TextSize = 13,
+Font = BODY_BOLD,
+ZIndex = 14,
+}, row)
+AddCorner(tp, 8)
+Create("UIGradient", {
+Rotation = 0,
+Color = CS({ CK(0, DEEP_PURPLE), CK(0.5, PURPLE), CK(1, DEEP_PURPLE) }),
+}, tp)
+local tpStroke = Create("UIStroke", { Color = LIGHT_PURPLE, Transparency = 0.35, Thickness = 1 }, tp)
+local tpScale = Create("UIScale", { Scale = 1 }, tp)
+Connect(tp.MouseEnter, function()
+Tween(tpStroke, 0.2, { Transparency = 0 })
+end)
+Connect(tp.MouseLeave, function()
+Tween(tpStroke, 0.25, { Transparency = 0.35 })
+end)
+Connect(tp.InputBegan, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(tpScale, 0.08, { Scale = 0.97 }, ES.Quad, ED.Out)
+end
+end)
+Connect(tp.InputEnded, function(input)
+if input.UserInputType == UIT.MouseButton1
+or input.UserInputType == UIT.Touch then
+Tween(tpScale, 0.18, { Scale = 1 }, ES.Back, ED.Out)
+end
+end)
+Connect(tp.MouseButton1Click, function()
+if TeleportTo(data.Pos) then
+tpStroke.Color = WHITE
+tpStroke.Transparency = 0
+Tween(tpStroke, 0.5, { Transparency = 0.35 })
+Notify("Teleportado para o Ponto " .. i)
+end
+end)
+end
+for i, data in ipairs(SavedPoints) do
+AddPointCard(i, data)
+end
+local distClock = 0
+Connect(RunService.Heartbeat, function(dt)
+distClock += dt
+if distClock < 0.25 then
+return
+end
+distClock = 0
+local root = GetRoot()
+for i, data in ipairs(SavedPoints) do
+local label = DistLabels[i]
+if label then
+if root then
+label.Text = math.floor((root.Position - data.Pos).Magnitude + 0.5) .. " studs"
+else
+label.Text = "-- studs"
+end
+end
+end
+end)
+table.insert(Unloaders, function()
+for _, tween in ipairs(PulseTweens) do
+tween:Cancel()
+end
+end)
+
+end
+local HubOpen = false
+local HubToken = 0
+local function SetHub(open)
+if open == HubOpen then
+return
+end
+HubOpen = open
+HubToken += 1
+local token = HubToken
+if open then
+Hub.Visible = true
+Tween(Hub, 0.35, { GroupTransparency = 0 }, ES.Quint, ED.Out)
+Tween(HubScale, 0.4, { Scale = 1 }, ES.Back, ED.Out)
+else
+Tween(Hub, 0.22, { GroupTransparency = 1 }, ES.Quad, ED.In)
+Tween(HubScale, 0.22, { Scale = 0.94 }, ES.Quad, ED.In)
+task.delay(0.25, function()
+if token == HubToken and not HubOpen then
+Hub.Visible = false
+end
+end)
+end
+end
+local function Unload()
+if Unloaded then
+return
+end
+Unloaded = true
+for _, fn in ipairs(Unloaders) do
+pcall(fn)
+end
+for _, connection in ipairs(Connections) do
+connection:Disconnect()
+end
+LogoSpin:Cancel()
+LogoPulse:Cancel()
+MenuGui:Destroy()
+OverlayGui:Destroy()
+end
+Connect(CloseButton.MouseButton1Click, function()
+SetHub(false)
+Tween(LogoEntrance, 0.25, { Scale = 0 }, ES.Back, ED.In)
+task.delay(0.3, Unload)
+end)
+Connect(MinimizeButton.MouseButton1Click, function()
+SetHub(false)
+end)
+MakeDraggable(LogoButton, LogoRoot, function()
+SetHub(not HubOpen)
+end, false)
+MakeDraggable(Header, Hub, nil, true)
+SelectTab(1)
+Tween(LogoEntrance, 0.6, { Scale = 1 }, ES.Back, ED.Out, 0.15)
+end
+local function ShowError(stage, err)
+warn("[ModoPVP] erro em " .. stage .. ": " .. tostring(err))
+pcall(function()
+local old = PlayerGui:FindFirstChild("AngelPvPError")
+if old then
+old:Destroy()
+end
+local gui = Create("ScreenGui", {
+Name = "AngelPvPError",
+IgnoreGuiInset = true,
+DisplayOrder = 2000000,
+ResetOnSpawn = false,
+}, nil)
+gui.Parent = PlayerGui
+local box = Create("TextLabel", {
+AnchorPoint = V2(0.5, 0),
+Position = U2(0.5, 0, 0, 12),
+Size = U2(0.92, 0, 0, 110),
+BackgroundColor3 = RGB(30, 8, 12),
+Text = "[ModoPVP] erro em " .. stage .. ":\n" .. tostring(err),
+TextColor3 = RGB(255, 200, 200),
+TextSize = 13,
+Font = FNT.Code,
+TextWrapped = true,
+TextXAlignment = TXA.Left,
+TextYAlignment = TYA.Top,
+}, gui)
+AddCorner(box, 8)
+Create("UIPadding", {
+PaddingLeft = UD(0, 8), PaddingRight = UD(0, 8), PaddingTop = UD(0, 6),
+}, box)
+end)
+end
+local okIntro, errIntro = xpcall(PlayIntro, debug.traceback)
+if not okIntro then
+ShowError("intro", errIntro)
+pcall(function()
+local leftover = PlayerGui:FindFirstChild("AngelPvPIntro")
+if leftover then
+leftover:Destroy()
+end
+end)
+end
+local okHub, errHub = xpcall(InitHub, debug.traceback)
+if not okHub then
+ShowError("hub", errHub)
+end
