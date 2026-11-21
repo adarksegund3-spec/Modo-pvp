@@ -1,4 +1,4 @@
--- ANGEL | MODO PVP v4 (intro + hub) | LocalScript / executor
+-- ANGEL | MODO PVP v5 (intro + hub) | LocalScript / executor
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -2034,68 +2034,6 @@ local SavedPoints = {
 { Pos = V3(254.43, 71.03, -530.688) },
 { Pos = V3(300.808, 68.95, -570.796) },
 }
-local banner = Create("Frame", {
-Size = U2(1, 0, 0, 58),
-BackgroundColor3 = WHITE,
-LayoutOrder = NextOrder(),
-ZIndex = 12,
-}, PagePoints)
-AddCorner(banner, 10)
-Create("UIGradient", {
-Rotation = 0,
-Color = CS({
-CK(0, RGB(74, 22, 138)),
-CK(0.55, RGB(22, 9, 42)),
-CK(1, RGB(6, 3, 12)),
-}),
-}, banner)
-local bannerStroke = Create("UIStroke", { Color = WHITE, Thickness = 1.3 }, banner)
-Create("UIGradient", {
-Rotation = 0,
-Color = CS({ CK(0, LIGHT_PURPLE), CK(1, DEEP_PURPLE) }),
-}, bannerStroke)
-Create("TextLabel", {
-Position = UO(16, 6),
-Size = U2(1, -120, 0, 26),
-BackgroundTransparency = 1,
-Text = "REDE DE PONTOS",
-TextColor3 = WHITE,
-TextSize = 20,
-Font = TITLE_FONT,
-TextXAlignment = LEFT,
-ZIndex = 13,
-}, banner)
-Create("TextLabel", {
-Position = UO(16, 34),
-Size = U2(1, -120, 0, 14),
-BackgroundTransparency = 1,
-Text = string.format("%02d LOCAIS  //  TELEPORTE INSTANTÂNEO", #SavedPoints),
-TextColor3 = Theme.Muted,
-TextSize = 10,
-Font = FNT.Code,
-TextXAlignment = LEFT,
-ZIndex = 13,
-}, banner)
-local bannerDot = Create("Frame", {
-AnchorPoint = V2(1, 0.5),
-Position = U2(1, -16, 0.5, 0),
-Size = UO(8, 8),
-BackgroundColor3 = RGB(80, 255, 140),
-ZIndex = 13,
-}, banner)
-AddCorner(bannerDot, 8)
-Create("TextLabel", {
-AnchorPoint = V2(1, 0.5),
-Position = U2(1, -30, 0.5, 0),
-Size = UO(60, 14),
-BackgroundTransparency = 1,
-Text = "ATIVO",
-TextColor3 = RGB(80, 255, 140),
-TextSize = 10,
-Font = FNT.Code,
-TextXAlignment = RIGHT,
-ZIndex = 13,
-}, banner)
 AddSection(PagePoints, "AVISO")
 local warning = Create("Frame", {
 Size = U2(1, 0, 0, 0),
@@ -2164,9 +2102,7 @@ return root
 end
 return nil
 end
-AddSection(PagePoints, "LOCAIS DE TELEPORTE")
-local DistLabels = {}
-local PulseTweens = {}
+AddSection(PagePoints, "PONTOS")
 local function TeleportTo(position)
 local character = Player.Character
 local root = GetRoot()
@@ -2183,222 +2119,21 @@ root.AssemblyLinearVelocity = V3(0, 0, 0)
 root.AssemblyAngularVelocity = V3(0, 0, 0)
 return true
 end
-local function Bracket(parent, ax, ay)
-local px = ax == 1 and -4 or 4
-local py = ay == 1 and -4 or 4
-Create("Frame", {
-AnchorPoint = V2(ax, ay),
-Position = U2(ax, px, ay, py),
-Size = UO(10, 1),
-BackgroundColor3 = LIGHT_PURPLE,
-BackgroundTransparency = 0.3,
-ZIndex = 14,
-}, parent)
-Create("Frame", {
-AnchorPoint = V2(ax, ay),
-Position = U2(ax, px, ay, py),
-Size = UO(1, 10),
-BackgroundColor3 = LIGHT_PURPLE,
-BackgroundTransparency = 0.3,
-ZIndex = 14,
-}, parent)
-end
-local function AddPointCard(i, data)
-local row = AddRow(PagePoints, 108)
-row.BackgroundColor3 = WHITE
-Create("UIGradient", {
-Rotation = 20,
-Color = CS({
-CK(0, RGB(14, 7, 26)),
-CK(0.6, RGB(26, 12, 48)),
-CK(1, RGB(54, 18, 100)),
-}),
-}, row)
--- barra de destaque lateral
-local bar = Create("Frame", {
-Position = UO(0, 12),
-Size = U2(0, 3, 1, -24),
-BackgroundColor3 = WHITE,
-ZIndex = 13,
-}, row)
-AddCorner(bar, 2)
-Create("UIGradient", {
-Rotation = 90,
-Color = CS({ CK(0, LIGHT_PURPLE), CK(1, DEEP_PURPLE) }),
-}, bar)
-local pulse = TweenService:Create(
-bar,
-TweenInfo.new(1.4 + i * 0.15, ES.Sine, ED.InOut, -1, true),
-{ BackgroundTransparency = 0.6 }
-)
-pulse:Play()
-table.insert(PulseTweens, pulse)
-Bracket(row, 1, 0)
-Bracket(row, 0, 1)
--- número do ponto
-local badge = Create("Frame", {
-Position = UO(16, 14),
-Size = UO(42, 42),
-BackgroundColor3 = RGB(8, 4, 16),
-ZIndex = 13,
-}, row)
-AddCorner(badge, 10)
-local badgeStroke = Create("UIStroke", { Color = WHITE, Thickness = 1.5 }, badge)
-Create("UIGradient", {
-Rotation = 45,
-Color = CS({ CK(0, LIGHT_PURPLE), CK(1, DEEP_PURPLE) }),
-}, badgeStroke)
-Create("TextLabel", {
-Size = US(1, 1),
-BackgroundTransparency = 1,
-Text = string.format("%02d", i),
-TextColor3 = WHITE,
-TextSize = 18,
-Font = FNT.Code,
-ZIndex = 14,
-}, badge)
-Create("TextLabel", {
-Position = UO(68, 13),
-Size = U2(1, -180, 0, 18),
-BackgroundTransparency = 1,
-Text = "PONTO " .. i,
-TextColor3 = Theme.Text,
-TextSize = 14,
-Font = BODY_BOLD,
-TextXAlignment = LEFT,
-ZIndex = 13,
-}, row)
-Create("TextLabel", {
-Position = UO(68, 35),
-Size = U2(1, -80, 0, 14),
-BackgroundTransparency = 1,
-Text = string.format("X %.1f   Y %.1f   Z %.1f", data.Pos.X, data.Pos.Y, data.Pos.Z),
-TextColor3 = LAVENDER,
-TextSize = 11,
-Font = FNT.Code,
-TextXAlignment = LEFT,
-TextTruncate = Enum.TextTruncate.AtEnd,
-ZIndex = 13,
-}, row)
--- distância ao vivo
-local pill = Create("Frame", {
-AnchorPoint = V2(1, 0),
-Position = U2(1, -16, 0, 14),
-Size = UO(96, 22),
-BackgroundColor3 = RGB(8, 4, 16),
-ZIndex = 13,
-}, row)
-AddCorner(pill, 11)
-Create("UIStroke", { Color = Theme.Stroke, Transparency = 0.45, Thickness = 1 }, pill)
-local dot = Create("Frame", {
-AnchorPoint = V2(0, 0.5),
-Position = U2(0, 9, 0.5, 0),
-Size = UO(6, 6),
-BackgroundColor3 = RGB(80, 255, 140),
-ZIndex = 14,
-}, pill)
-AddCorner(dot, 6)
-local dotPulse = TweenService:Create(
-dot,
-TweenInfo.new(0.9, ES.Sine, ED.InOut, -1, true),
-{ BackgroundTransparency = 0.7 }
-)
-dotPulse:Play()
-table.insert(PulseTweens, dotPulse)
-DistLabels[i] = Create("TextLabel", {
-Position = UO(20, 0),
-Size = U2(1, -24, 1, 0),
-BackgroundTransparency = 1,
-Text = "-- studs",
-TextColor3 = LIGHT_PURPLE,
-TextSize = 10,
-Font = FNT.Code,
-TextXAlignment = LEFT,
-ZIndex = 14,
-}, pill)
--- linha divisória
-local line = Create("Frame", {
-Position = UO(16, 64),
-Size = U2(1, -32, 0, 1),
-BackgroundColor3 = LAVENDER,
-ZIndex = 13,
-}, row)
-Create("UIGradient", {
-Transparency = NS({ NK(0, 1), NK(0.5, 0.45), NK(1, 1) }),
-}, line)
--- botão teleportar
-local tp = Create("TextButton", {
-Position = UO(16, 72),
-Size = U2(1, -32, 0, 28),
-BackgroundColor3 = WHITE,
-AutoButtonColor = false,
-Text = "TELEPORTAR",
-TextColor3 = WHITE,
-TextSize = 13,
-Font = BODY_BOLD,
-ZIndex = 14,
-}, row)
-AddCorner(tp, 8)
-Create("UIGradient", {
-Rotation = 0,
-Color = CS({ CK(0, DEEP_PURPLE), CK(0.5, PURPLE), CK(1, DEEP_PURPLE) }),
-}, tp)
-local tpStroke = Create("UIStroke", { Color = LIGHT_PURPLE, Transparency = 0.35, Thickness = 1 }, tp)
-local tpScale = Create("UIScale", { Scale = 1 }, tp)
-Connect(tp.MouseEnter, function()
-Tween(tpStroke, 0.2, { Transparency = 0 })
-end)
-Connect(tp.MouseLeave, function()
-Tween(tpStroke, 0.25, { Transparency = 0.35 })
-end)
-Connect(tp.InputBegan, function(input)
-if input.UserInputType == UIT.MouseButton1
-or input.UserInputType == UIT.Touch then
-Tween(tpScale, 0.08, { Scale = 0.97 }, ES.Quad, ED.Out)
-end
-end)
-Connect(tp.InputEnded, function(input)
-if input.UserInputType == UIT.MouseButton1
-or input.UserInputType == UIT.Touch then
-Tween(tpScale, 0.18, { Scale = 1 }, ES.Back, ED.Out)
-end
-end)
-Connect(tp.MouseButton1Click, function()
+for i, data in ipairs(SavedPoints) do
+local row = AddRow(PagePoints, 88)
+RowLabel(row, "Ponto " .. i, 8, 14, Theme.Text, BODY_BOLD, U2(1, -24, 0, 18))
+RowLabel(row, string.format(
+"X: %s   Y: %s   Z: %s",
+FormatNumber(data.Pos.X), FormatNumber(data.Pos.Y), FormatNumber(data.Pos.Z)
+), 29, 11, Theme.Muted, BODY, U2(1, -24, 0, 14))
+local button = AddButton(row, "Teleportar", function()
 if TeleportTo(data.Pos) then
-tpStroke.Color = WHITE
-tpStroke.Transparency = 0
-Tween(tpStroke, 0.5, { Transparency = 0.35 })
 Notify("Teleportado para o Ponto " .. i)
 end
 end)
+button.Position = UO(12, 48)
+button.Size = U2(1, -24, 0, 30)
 end
-for i, data in ipairs(SavedPoints) do
-AddPointCard(i, data)
-end
-local distClock = 0
-Connect(RunService.Heartbeat, function(dt)
-distClock += dt
-if distClock < 0.25 then
-return
-end
-distClock = 0
-local root = GetRoot()
-for i, data in ipairs(SavedPoints) do
-local label = DistLabels[i]
-if label then
-if root then
-label.Text = math.floor((root.Position - data.Pos).Magnitude + 0.5) .. " studs"
-else
-label.Text = "-- studs"
-end
-end
-end
-end)
-table.insert(Unloaders, function()
-for _, tween in ipairs(PulseTweens) do
-tween:Cancel()
-end
-end)
 
 end
 local HubOpen = false
